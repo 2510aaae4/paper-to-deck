@@ -1,7 +1,7 @@
 ---
 name: paper-to-deck
-version: 0.4.0
-updated: 2026-04-22
+version: 0.4.1
+updated: 2026-04-23
 description: Convert an academic paper PDF into a polished, presentation-ready slide deck (.pptx). Use this whenever the user hands over a research PDF and wants slides — journal club, lab meeting, conference talk, lightning overview, or any context where they need to present a paper. Also triggers on phrases like "turn this paper into slides", "make a deck from this PDF", "prepare a talk on this article", "論文轉簡報", "做組會報告". Enforces a structured design interview upfront (audience / length / style / emphasis / language) before any slide is drafted — do not skip the interview even if the user seems in a hurry. Default output language is English; always explicitly offer Chinese or bilingual as alternatives.
 ---
 
@@ -52,9 +52,9 @@ PDF path given
      ↓
 [3] Outline      → outline.md (SHOW USER, WAIT FOR OK)
      ↓
-[4] Build HTML   → deck.html (show first 3 slides early)
+[4] Build HTML   → <slug>.html (hand off, do not self-preview)
      ↓
-[5] Export PPTX  → deck.pptx
+[5] Export PPTX  → <slug>.pptx
      ↓
 [6] Summary      → caveats + next steps, 2 sentences max
 ```
@@ -62,6 +62,14 @@ PDF path given
 ### Step 1 · Extract
 
 **Before running any extraction code, read `references/pdf-extraction.md`.** It documents the three-tier fallback (embedded images → caption-anchored page crop → full-page render) and publisher-specific fingerprints (arXiv, Elsevier, Nature, IEEE) that tell you which tier to start from. Running tier 1 blindly on a Lancet/Cell paper wastes a cycle and produces an empty figures directory — the script should detect the publisher and jump to tier 2 when warranted.
+
+**Naming convention · slug from paper identity.** The project directory and the final deliverables (`<slug>.html`, `<slug>.pptx`) all use the same paper-derived slug. Decide it *before* you run `extract_paper.py`:
+
+1. **Trial acronym first.** If the paper's title or abstract names a registered trial acronym (2+ uppercase letters, often followed by "trial" / "study" / "Study Group"), use it. Examples: `orchestra-trial`, `recovery-trial`, `checkmate-577`, `embraca`, `nrg-gi005`. Append `-trial` / `-study` when the bare acronym is ambiguous (ORCHESTRA alone could be anything; ORCHESTRA-trial disambiguates).
+2. **Otherwise** · `<first-author-surname>-<year>-<1–3-topic-words>`. Surname lowercase; year = 4-digit publication year; topic words are substantive nouns from the title (no stopwords). Example: Gootjes EC et al. 2026 "Tumor Debulking in…" without a trial acronym would become `gootjes-2026-debulking`.
+3. **Normalize**: lowercase, ASCII-only, hyphen-separated, ≤ 40 characters. Strip diacritics. No spaces, no underscores.
+
+The slug is fixed at this step and used everywhere downstream: `--out-dir <slug>`, `<slug>.html`, `<slug>.pptx`. Do not use generic names like `deck/`, `output/`, or `jama-deck/` — they make archives and reference lists useless the moment more than one paper accumulates.
 
 Run `python scripts/extract_paper.py <pdf-path> --out-dir <project-dir>`. Produces:
 - `paper.json` — `{title, authors, year, venue, abstract, sections[], figures[], tables[], citations[]}`
@@ -116,6 +124,9 @@ Read `references/slide-patterns.md` for the 8 canonical research-slide patterns 
 Accept all edits, regenerate the outline, confirm again if changes were non-trivial.
 
 ### Step 4 · Build HTML deck
+
+**Before writing any HTML, read `references/html-deck-gotchas.md`.** It documents CSS cascade bugs that are invisible to smoke tests and only manifest when the user presses `→` for the first time (canonical case: cover slide `display: flex` silently overrides `.slide { display: none }` at equal specificity). Each entry is a real incident.
+
 Only after outline is approved. Use `deck_stage.js` (port or inline) with these constraints:
 - Fixed 1920×1080 canvas, letterbox-scaled to viewport
 - Typography: body ≥ 24px, slide title ≥ 36px, caption ≥ 18px
@@ -123,10 +134,15 @@ Only after outline is approved. Use `deck_stage.js` (port or inline) with these 
 - One dominant figure per slide, max 70% slide width, caption directly beneath
 - No gradients, no emoji, no stock icons, no decorative shapes
 - Speaker notes embedded as `<script type="application/json" id="speaker-notes">` — a JSON array indexed by slide number
+- **State-dependent `display:` rules must be qualified by the state class** (see gotcha §1)
 
-Show the user the first 3 slides early. Get feedback before generating the rest.
+**Filename: `<slug>.html`** in the project dir (see Step 1 for slug rules). Do not emit `deck.html` — generic names stop being useful the moment the user has more than one paper in an archive.
+
+**Hand-off, not self-verification.** After writing `<slug>.html`, tell the user the file path and the 5-second check (`open, press → once, confirm slide 1 disappears`). **Do not spin up Chrome MCP + local server to screenshot the first 3 slides yourself.** The user is the authoritative judge of rendering, and the class of bug that visual QA catches (cascade, font fallback, overflow) is invisible to an in-skill headless Chrome too — so self-verification wastes time without catching bugs. Wait for user feedback before moving to Step 5.
 
 ### Step 5 · Export to PPTX
+
+**Filename: `<slug>.pptx`** in the project dir (same slug as Step 1 / Step 4). Do not emit `deck.pptx`.
 
 **Before writing any PPTX code, read `references/pptx-gotchas.md`.** It documents bugs that have already bitten this pipeline — letter-spacing unit mismatch (OOXML `spc` is 1/100 pt, not 1/100 em), CJK font fallback silently breaking, text auto-fit, OKLCH-to-sRGB conversion drift, and table-cell run-formatting inheritance. Each one produces layout that looks broken only when a human opens the file — smoke-tests on file size and shape count miss all of them.
 
@@ -142,7 +158,7 @@ If the paper relies on LaTeX math, read `references/equation-handling.md` before
 ### Step 6 · Summary
 Final message to the user, 2 sentences max:
 1. Caveats — anything still requiring their attention (e.g., "slide 7's figure is a placeholder — you need to supply it; equations on slide 4 are rasters, not editable")
-2. Next step — one concrete action ("open deck.pptx in PowerPoint; run through speaker notes once")
+2. Next step — one concrete action ("open `<slug>.pptx` in PowerPoint; run through speaker notes once")
 
 No diff recap, no long summary of what was done.
 
@@ -194,6 +210,7 @@ No diff recap, no long summary of what was done.
 |---|---|
 | `references/pdf-extraction.md` | Step 1 — before running `extract_paper.py`, especially if publisher isn't arXiv |
 | `references/external-extractors.md` | Step 1 — when/why docling fires (Tier 0) and how it interacts with fallback tiers |
+| `references/html-deck-gotchas.md` | Step 4 — before writing `<slug>.html`; CSS cascade & hand-off discipline |
 | `references/pptx-gotchas.md` | Step 5 — before writing any `.pptx` generation code |
 | `references/verification.md` | Step 5–6 — before declaring the deck done |
 | `references/windows-setup.md` | Any step, on Windows — cp950 encoding, pymupdf install, LibreOffice headless, path handling |

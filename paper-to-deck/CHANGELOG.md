@@ -4,6 +4,35 @@ Version history for the `paper-to-deck` skill. Each version corresponds to a rea
 
 ---
 
+## v0.4.1 — 2026-04-23 · HTML deck gotchas + hand-off discipline
+
+### Added
+- `references/html-deck-gotchas.md` — new reference file, parallel to `pptx-gotchas.md`. Documents CSS cascade bugs and UI hand-off discipline for Step 4.
+- Gotcha §1 · **CSS specificity on display-controlling rules**: an un-qualified modifier class (e.g. `.cover { display: flex }`) silently overrides `.slide { display: none }` at equal specificity when declared later. Cover slide remains visible on every subsequent slide, content collides. No console error; no automated signal. Fix: qualify state-dependent display with the state class — `.slide.cover.active { display: flex }`.
+- Gotcha §2 · **UI verification is the user's job**: the skill runner must not spin up Chrome MCP + local HTTP server to preview the deck itself. The user is the authoritative judge of rendering; self-verification wastes time without catching cascade/font-fallback bugs (which look "fine" to headless Chrome too).
+- General rule at end of `html-deck-gotchas.md`: **"the first keyboard arrow is the cheapest QA"** — instruct the user to open the file and press `→` once to confirm slide 1 disappears. A 5-second check that catches the most common cascade bug every time.
+
+### Changed
+- `SKILL.md` Step 4 · now opens with `Before writing any HTML, read references/html-deck-gotchas.md` (parallel to the pptx-gotchas.md directive in Step 5).
+- `SKILL.md` Step 4 · added explicit hand-off paragraph: do **not** self-verify via Chrome MCP; send the file path + 5-second check and wait for the user.
+- `SKILL.md` Reference files table · new row for `html-deck-gotchas.md`.
+
+### Why this version exists
+The **ORCHESTRA trial deck** (Gootjes et al., JAMA 2026;335(15)) journal-club run on 2026-04-23 hit the CSS specificity bug directly. Slides 2 and 3 rendered cover content overlapped on top of their own content — invisible when only viewing slide 1 — and the skill runner tried to self-verify with Chrome MCP instead of handing the file to the user immediately. The user had to open the HTML independently and ask "why do these three pages look the same?" to surface the bug. Time was lost on the round-trip. Both lessons are now codified.
+
+### Added (naming convention)
+- `SKILL.md` Step 1 · **slug-based naming rule**. The project directory and all deliverables use a paper-derived slug: trial acronym first (`orchestra-trial`, `recovery-trial`, `checkmate-577`), otherwise `<first-author-surname>-<year>-<topic-words>` (e.g., `gootjes-2026-debulking`). Normalized to lowercase-ASCII-hyphen, ≤ 40 chars. Replaces generic names like `jama-deck/`, `deck/`, `output/`.
+- Step 4 emits `<slug>.html`, Step 5 emits `<slug>.pptx`. Step 6 final-message template updated to reference `<slug>.pptx`.
+
+### Why this version exists (naming)
+The ORCHESTRA run produced `jama-deck/deck.html` + `jama-deck/deck.pptx` — the names say nothing about which paper it is. Once the user accumulates 3+ paper decks in an archive folder, the filenames must carry identity. Trial acronyms are the cleanest identifier for RCTs (what clinicians actually remember the paper by); first-author + year is the standard fallback for papers without an acronym.
+
+### Known limitations
+- `html-deck-gotchas.md` starts with 2 entries. Likely more exist (font-fallback on mixed EN/CJK runs, `<img>` intrinsic-size vs container-constrained layout, keyboard focus after `requestFullscreen`). Add as they surface.
+- Slug selection is agent discipline, not yet enforced by `extract_paper.py`. A future version could auto-propose a slug from `paper.json.title` and let the agent confirm.
+
+---
+
 ## v0.4.0 — 2026-04-23 · Docling Tier 0 integration
 
 ### Added
