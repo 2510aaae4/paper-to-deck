@@ -1,0 +1,149 @@
+{
+  "skill_name": "paper-to-deck",
+  "schema_version": 1,
+  "evals": [
+    {
+      "id": 1,
+      "name": "clinical-review-mixed-audience",
+      "added": "2026-04-22",
+      "status": "baseline",
+      "prompt": "我下週有 lab meeting 要 present 這篇 paper，幫我做 slides",
+      "setup": {
+        "paper": {
+          "type": "clinical-review",
+          "venue_class": "high-impact medical journal (Elsevier family)",
+          "year": 2025,
+          "pdf_filename": "[held locally in _private/ for licensing reasons; the extraction and design lessons below are general and reproducible against any comparable review paper]",
+          "note": "Elsevier-family layout. Tests Tier-2 pdf-extraction path (get_images returns empty, must use caption-anchored page crop)."
+        },
+        "interview_answers": {
+          "Q1_audience": "A",
+          "Q2_length": "B",
+          "Q3_interaction": "B",
+          "Q4_takeaway": "A",
+          "Q5_personal_link": "C",
+          "Q6_visual_style": "B",
+          "Q7_slide_language": "A",
+          "Q8_notes_language": "B",
+          "Q9_paper_specific_emphasis": "A",
+          "Q10_figure_usage": "A"
+        }
+      },
+      "expected_outputs": {
+        "files_produced": [
+          "paper.json",
+          "figures/fig-01.png through fig-04.png (with .txt captions)",
+          "pages/page-NN.png sidecars for every host page",
+          "outline.md (20 slides)",
+          "deck.html (self-contained, uses Taipei Sans TC Beta with JhengHei fallback)",
+          "deck.pptx (13.333x7.5 in, 16:9, editable text boxes)"
+        ],
+        "design_brief_invariants": [
+          "Cover slide shows the paper title prominently — the user corrected an earlier attempt that demoted it; do not revert",
+          "All paper figures embedded on dedicated figure slides (per Q10=A)",
+          "Primary-emphasis block spans ~35% of deck (per Q4=A emphasis weighting)",
+          "Parallel subjects (e.g. three pathogens / three mechanisms) each get a dedicated slide",
+          "Slide titles on content slides are statements or questions, not topic labels",
+          "'Figure N' does NOT appear as title or eyebrow on content slides",
+          "Every content slide keeps body text under 40 words",
+          "Every slide has Chinese speaker notes (≥ 130 characters each)",
+          "All-caps labels have reasonable tracking — no exploded letter-spacing"
+        ],
+        "verification_tier_A": [
+          "OCR of each slide returns at least 80% of expected body text",
+          "Blown-tracking detector (space-ratio > 0.4) returns false for every slide",
+          "Figure slides have non-background pixel regions >= 400x300"
+        ]
+      },
+      "known_limitations": [
+        "Figure crops from pymupdf page-clip are 200 DPI — fine for on-screen projection, may soften in print",
+        "Taipei Sans TC Beta is loaded from jsdelivr CDN in HTML deck; PPTX has no font-embed so relies on viewer having the font installed (fallback: Microsoft JhengHei on Windows)",
+        "No LaTeX math in this paper, so equation-handling.md paths were not exercised"
+      ],
+      "regression_signals": {
+        "if_cover_title_becomes_a_statement_instead_of_paper_title": "Bug — user preference was explicit. See CHANGELOG v0.2.0 'Fixed' entry.",
+        "if_Figure_N_appears_as_eyebrow_or_title_on_content_slides": "Bug — violates anti-slop #10. Eyebrow should be topic only; figure number in caption.",
+        "if_core_content_slides_have_paragraph_style_notes_next_to_drug_or_item_list": "Regression — violates anti-slop #12 and pattern discipline. Should be row-list + 2 short bullets, ≤ 40 words.",
+        "if_any_all_caps_label_has_letters_visually_far_apart": "PPTX letter-spacing bug — see pptx-gotchas.md §1."
+      }
+    },
+    {
+      "id": 2,
+      "name": "phase3-rct-mixed-audience",
+      "added": "2026-04-23",
+      "status": "baseline",
+      "prompt": "start a paper · 混合含 trainees · 30-45 min · treatment-narrative 重點 · 英文 slide + 中文 notes",
+      "setup": {
+        "paper": {
+          "type": "phase-3 randomized controlled trial, positive primary",
+          "venue_class": "top-tier clinical journal (large spread, landscape tables)",
+          "year": 2026,
+          "pdf_filename": "[held locally in _private/ for licensing reasons]",
+          "note": "Exercised Tier 2b (facing-page figure) and Tier 2c (landscape table rotation) and Tier 0 (docling)."
+        },
+        "interview_answers": {
+          "Q1_audience": "D",
+          "Q2_length": "B",
+          "Q3_interaction": "B",
+          "Q4_takeaway": "C",
+          "Q5_personal_link": "C",
+          "Q6_visual_style": "B",
+          "Q7_slide_language": "A",
+          "Q8_notes_language": "B",
+          "Q9_hook_framing": "C",
+          "Q10_mechanism_depth": "B",
+          "Q11_subgroup_coverage": "A",
+          "Q12_safety_split": "B"
+        }
+      },
+      "expected_outputs": {
+        "files_produced": [
+          "paper.json with `figures[]` and `tables[]` entries",
+          "figures/ with tight crops including one facing-page figure",
+          "tables/ with portrait + landscape-rotated images",
+          "pages/ sidecars for every host page",
+          "outline.md (25 slides after 3 table-overview slides inserted)",
+          "deck.html · deck.pptx"
+        ],
+        "design_brief_invariants": [
+          "Narrative arc: hook (slide 2) → setup (slide 4) → payoff (slide 18) → echo (slide 22) is intact",
+          "Facing-page figure extracted from the correct page (not the caption page)",
+          "Landscape tables render in readable orientation",
+          "All three paper tables reach the deck (one baseline + two landscape overviews)"
+        ]
+      },
+      "regression_signals": {
+        "if_facing_page_figure_returns_a_text_crop": "Tier 2b regression — see pdf-extraction.md §Tier 2b",
+        "if_landscape_table_image_is_a_thin_vertical_sliver": "Tier 2c regression — see pdf-extraction.md §Tier 2c",
+        "if_docling_picks_up_small_page_chrome_icons_as_figures": "Junk filter regression — external-extractors.md §'What docling does poorly'"
+      }
+    }
+  ],
+  "candidate_next_evals": [
+    {
+      "name": "arxiv-ml-primary-research",
+      "why": "Test Tier-1 pdf-extraction (embedded images) and the IMRAD P1-P8 pattern chain on a theory-heavy paper with equations",
+      "suggested_paper_type": "NeurIPS / ICML proceedings paper with 4+ figures and 3+ equations"
+    },
+    {
+      "name": "nature-short-letter",
+      "why": "Test the 5-minute lightning talk format (P1 -> P3 -> P5 -> P8) and a different publisher fingerprint",
+      "suggested_paper_type": "Nature Letters or Science Report, under 6 pages"
+    },
+    {
+      "name": "thematic-review-p9",
+      "why": "Test pattern P9 Thematic Review explicitly — a review paper where the 5-theme structure is natural and IMRAD forcing would fail",
+      "suggested_paper_type": "A 'five emerging technologies in X' style review"
+    },
+    {
+      "name": "bilingual-zh-en",
+      "why": "Test Q7=C (English titles + Chinese body) — the deck currently only exercises pure-English slides + Chinese notes",
+      "suggested_paper_type": "Any paper; exercises layout wrapping for mixed-script text"
+    },
+    {
+      "name": "equation-heavy-physics-or-ml-theory",
+      "why": "Exercise equation-handling.md paths (matplotlib retype vs LaTeX Beamer switch)",
+      "suggested_paper_type": "Theoretical physics / ML theory with 6+ inline equations"
+    }
+  ]
+}

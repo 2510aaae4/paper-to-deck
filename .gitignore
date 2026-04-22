@@ -1,0 +1,44 @@
+# Private / copyright-sensitive content (NEVER commit)
+_private/
+test-run-*/
+test-output/
+test-docling*/
+*.pdf
+
+# Third-party licensed material (keep local, do not redistribute)
+claude-canva-design/
+huashu_skill_reference.md
+
+# Personal working files
+Opinion.md
+*.screenshot.png
+screenshots/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+env/
+.Python
+
+# Docling / HuggingFace caches
+.cache/
+pages/_docling_cache/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build outputs (generated per-paper; never part of skill)
+*.pptx
+*.pdf
+deck.html
+
+# Keep: assets/outline-template.md stays public (it's a template, not output)
