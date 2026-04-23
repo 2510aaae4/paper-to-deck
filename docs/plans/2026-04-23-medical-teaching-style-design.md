@@ -3,10 +3,6 @@
 ## 背景
 
 使用者要把 `paper-to-deck` 的風格往**台灣內科 teaching lecture** 靠攏，不重新開 skill、不鬆動 single-paper journal club workflow。參考 decks 兩份（皆非使用者本人作品，放在 `_private/style-ref/`、`_private/style-ref2/`）：
-
-- `20250812_Rational use of antibiotics and antimicrobial resistance.pdf`（Chin-Shiang Tsai, NCKUH 感染科, 50 頁）
-- `20231003 Year Review Adrenal Pituitary.pdf`（NCKU 內分泌科, 56 頁）
-
 兩份共用「Year Review of Internal Medicine」系列語法：紅色 accent、黑粗大字、圖為主體、meme 可接受、中英混排、NCKU 機構感。
 
 ---
