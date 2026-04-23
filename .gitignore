@@ -12,6 +12,15 @@ test-docling*/
 # Add each new paper's output directory explicitly here so we don't accidentally
 # commit extracted artefacts. A broad glob would risk ignoring skill internals.
 dobrescu-2026-picc/
+tande-2026-spinal-epidural-abscess/
+
+# OpenEvidence MCP integration · personal session data
+# These MUST never ship publicly, even if _private/ is ever relaxed:
+#   - cookies.json        · your OE auth session
+#   - playwright-profile/ · your Playwright-managed browser profile
+cookies.json
+playwright-profile/
+openevidence-mcp/
 
 # Third-party licensed material (keep local, do not redistribute)
 claude-canva-design/

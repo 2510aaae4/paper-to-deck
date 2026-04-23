@@ -1,8 +1,8 @@
 ---
 name: paper-to-deck
-version: 0.5.0
-updated: 2026-04-23
-description: Convert an academic paper PDF into a polished, presentation-ready slide deck (.pptx). Use this whenever the user hands over a research PDF and wants slides — journal club, lab meeting, conference talk, lightning overview, or any context where they need to present a paper. Also triggers on phrases like "turn this paper into slides", "make a deck from this PDF", "prepare a talk on this article", "論文轉簡報", "做組會報告". Enforces a structured design interview upfront (audience / length / style / emphasis / language / medical-teaching visual options) before any slide is drafted — do not skip the interview even if the user seems in a hurry. Default output language is English; always explicitly offer Chinese or bilingual as alternatives. v0.5.0 adds medical-teaching visual vocabulary (crimson-blue / teal / minimal themes) and narrow allowlisted public-domain imagery fetch.
+version: 0.6.0
+updated: 2026-04-24
+description: Convert an academic paper PDF into a polished, presentation-ready slide deck (.pptx). Use this whenever the user hands over a research PDF and wants slides — journal club, lab meeting, conference talk, lightning overview, or any context where they need to present a paper. Also triggers on phrases like "turn this paper into slides", "make a deck from this PDF", "prepare a talk on this article", "論文轉簡報", "做組會報告". Enforces a structured design interview upfront (audience / length / style / emphasis / language / medical-teaching visual options) before any slide is drafted — do not skip the interview even if the user seems in a hurry. Default output language is English; always explicitly offer Chinese or bilingual as alternatives. v0.5.0 adds medical-teaching visual vocabulary (crimson-blue / teal / minimal themes) and narrow allowlisted public-domain imagery fetch. v0.6.0 adds Step 3.5 "OE extension round" — for clinical papers, the agent proposes 3–4 EBM questions (therapy/prognosis/diagnosis) via OpenEvidence MCP and appends each as one slide at the end of the deck, framed as extension not audit.
 ---
 
 # Paper to Deck
@@ -44,22 +44,24 @@ Permitted external access (v0.5.0):
 
 ---
 
-## The 6-step workflow
+## The 7-step workflow
 
 ```
 PDF path given
      ↓
-[1] Extract      → scripts/extract_paper.py → paper.json + figures/
+[1]   Extract       → scripts/extract_paper.py → paper.json + figures/
      ↓
-[2] Interview    → references/interview.md → design_brief.json
+[2]   Interview     → references/interview.md → design_brief.json
      ↓
-[3] Outline      → outline.md (SHOW USER, WAIT FOR OK)
+[3]   Outline       → outline.md (SHOW USER, WAIT FOR OK)
      ↓
-[4] Build HTML   → <slug>.html (hand off, do not self-preview)
+[3.5] OE extension  → references/oe-extension.md → 3–4 EBM questions appended
+     ↓                (clinical papers only; skippable)
+[4]   Build HTML    → <slug>.html (hand off, do not self-preview)
      ↓
-[5] Export PPTX  → <slug>.pptx
+[5]   Export PPTX   → <slug>.pptx
      ↓
-[6] Summary      → caveats + next steps, 2 sentences max
+[6]   Summary       → caveats + next steps, 2 sentences max
 ```
 
 ### Step 1 · Extract
@@ -128,6 +130,26 @@ Read `references/slide-patterns.md` for the 8 canonical research-slide patterns 
 
 Accept all edits, regenerate the outline, confirm again if changes were non-trivial.
 
+### Step 3.5 · OE extension round (clinical papers only, opt-in)
+
+**Read `references/oe-extension.md` before running this step.** It captures the full protocol; the summary here is only for orientation.
+
+After the outline is approved — but before any HTML is written — offer the user the option to append 3–4 EBM extension slides at the end of the deck. Each slide answers one question the paper raises but does not fully address, verified via OpenEvidence. The framing is **extend**, not audit: OE is used to enrich the deck with downstream evidence, not to challenge the source paper.
+
+Before offering the step, check `mcp__openevidence__oe_auth_status`. If unauthenticated, skip the step and tell the user to re-auth in a fresh session rather than degrading to partial OE — a deck with 2 OE-backed slides and 2 manually-written "extension" slides is a worse artifact than a deck without the extension block.
+
+Ask the user once (Q-extension: yes-and-discuss / yes-use-defaults / skip). If yes, propose a bundle of 4 candidate questions as a table — one per axis (therapy / prognosis / diagnosis) plus a wildcard. **Flavor mix: mainly clinician's-next-question (A), with at least one evidence-deepener (B).** Pure-B bundles feel like methodology lectures; pure-A misses the chance to deepen. Let the user revise, then execute via `mcp__openevidence__oe_ask` for each approved question.
+
+Each extension slide:
+- Title **is the question itself** (ends with `?`) — a narrow exception to the deck-wide "statement-or-topic" title rule, because the slide's job is *pose-then-answer*.
+- Body ≤40 words (deck-wide rule still applies).
+- Citations inline in author-year form, full bibliography merges into the existing References slide.
+- Marked with `data-extension="true"` so Step 4's HTML builder applies a subtle visual cue (dashed top-rule or muted tint) — the audience should be able to tell this block is "what lies beyond the paper" without it being announced.
+
+Placement: extension slides sit **before** the References slide; if the deck has a V7 Takeaways / Take-home slide, extensions go **between** Takeaways and References. Update `outline.md` with the extension entries + `article_id` trace for each question before moving to Step 4.
+
+Skip this step entirely if (a) the paper is non-clinical — ML/physics/engineering papers lack therapy/prognosis/diagnosis axes; (b) the deck is <10 slides — no room for 3–4 extensions; (c) the user opts out.
+
 ### Step 4 · Build HTML deck
 
 **Before writing any HTML, read `references/html-deck-gotchas.md`.** It documents CSS cascade bugs that are invisible to smoke tests and only manifest when the user presses `→` for the first time (canonical case: cover slide `display: flex` silently overrides `.slide { display: none }` at equal specificity). Each entry is a real incident.
@@ -184,6 +206,7 @@ No diff recap, no long summary of what was done.
 
 - [ ] Interview run, `design_brief.json` saved
 - [ ] Outline approved by user
+- [ ] **If clinical paper**: Step 3.5 OE extension round offered to the user (yes-discuss / yes-defaults / skip). If accepted, 3–4 extension slides added to outline with axis mix (therapy/prognosis/diagnosis) and flavor mix (mainly A, ≥1 B). Each has an `article_id` trace from `mcp__openevidence__oe_ask`.
 - [ ] Every slide has at most one main message
 - [ ] **Every content-slide title is a statement or question — not a topic label.** "CRE Treatment" / "Figure 3 · New drugs" / "Methods" all fail this check. (Cover slide is exempt — its job is paper identification, so prominent paper title is correct there.)
 - [ ] **Body text ≤ 40 words per slide.** Measure the densest slides; if over, split or move detail to notes.
@@ -206,6 +229,7 @@ No diff recap, no long summary of what was done.
 | `references/public-imagery.md` | Step 2 (Q17) — allowlist, licence policy, attribution format, meme policy |
 | `assets/themes/*.json` | Step 4–5 — palette + typography + cover/footer tokens per visual scheme |
 | `references/anti-slop-academic.md` | Step 4 — before writing any slide content |
+| `references/oe-extension.md` | Step 3.5 — clinical-paper EBM extension round protocol (OE MCP questions → 3–4 end-of-deck slides) |
 | `references/citation-on-slide.md` | Step 3–4 — author-year format, figure attribution, references slide rules |
 | `references/figure-attribution.md` | Step 4 — fair use decision tree, redraw-vs-embed logic |
 | `references/equation-handling.md` | Step 3–4 — only if the paper has substantive equations |

@@ -18,7 +18,7 @@
 └── _private/                 · 不進 repo · 本機測試產出、版權敏感檔、第三方 licensed 參考素材
 ```
 
-兩個 skill 分開維護、各自有 `SKILL.md` 與 `CHANGELOG.md`。`start` 是窄入口（只做 PDF 驗證 + 交棒），`paper-to-deck` 是主體（interview、outline、slide 建構、PPTX 匯出全在這）。
+兩個 skill 分開維護、各自有 `SKILL.md` 與 `CHANGELOG.md`。`start` 是窄入口（PDF 驗證 + 環境檢查：packages 必要、OE cookie opt-in + 交棒時帶著 `OE_AVAILABLE` 旗標），`paper-to-deck` 是主體（interview、outline、slide 建構、PPTX 匯出全在這；Step 3.5 延伸題看 `OE_AVAILABLE` 決定是否執行）。
 
 **`_private/` 的約定**：任何來自某篇論文的 PDF、擷取圖 / 表、全文 dump、按特定論文產出的 deck / pptx，都放這裡。第三方 licensed 參考素材（e.g. 別人的 SKILL.md 鏡像）也放這裡。這個資料夾被 `.gitignore` 排除，永遠不進公開 repo。
 
@@ -42,6 +42,14 @@ python paper-to-deck/scripts/extract_paper.py <pdf> --out-dir <project-dir>
 
 ### Step 3 · Outline（等 user 批）
 依面談結果產 `outline.md`（22 張左右），user 批准後才動 slide。
+
+### Step 3.5 · OE extension round（臨床論文 opt-in · v0.6.0 加入）
+Outline 過關後、動 HTML 前，若是臨床論文且 OE MCP 已認證，agent 提案 3–4 題延伸 EBM 問題（therapy / prognosis / diagnosis 三軸），每題一張 slide 放在 References 前。
+- **定位是延伸、不是 audit**——出發點是「這篇論文勾起聽眾什麼問題但沒完全回答」，不是挑戰論文對錯。
+- **Flavor 混合**：主要 A（clinician's next-question，實用型），**至少一題 B**（evidence-deepener，用 downstream 證據把論文敘述弱的點補齊）。純 A 太淺、純 B 太像方法學課。
+- **Slide title = 問題本身**（以 `?` 結尾）——這是對「title 是 statement 或 question」規則的窄化：延伸 slide 永遠問題形，因為功能是 pose-then-answer。
+- **視覺標記** `data-extension="true"`——dashed top-rule 或輕微 tint，讓聽眾看得出「這段是論文之外」。
+- 跳過條件：非臨床論文 / deck <10 張 / user 說 skip。完整協議在 `paper-to-deck/references/oe-extension.md`。
 
 ### Step 4 · HTML 建構
 先做前 2-3 張給 user 早期 feedback，再補完剩餘。HTML 支援 `←/→` 切、`N` 看 speaker notes、`F` 全螢幕、`Home/End` 跳首末。
@@ -104,6 +112,7 @@ Cover slide 的主職是「讓聽眾立刻認出是哪篇論文」——**論文
 | 改面談問題 | `paper-to-deck/references/interview.md` |
 | 改 slide pattern / anti-slop | `references/slide-patterns.md` · `references/anti-slop-academic.md` |
 | 調整醫學教學視覺（V1–V8、調色盤） | `references/slide-patterns.md`（下半）· `assets/themes/*.json` |
+| 設計 / 調整 OE 延伸題流程 | `paper-to-deck/references/oe-extension.md` |
 | 找 public-domain 圖 | `references/public-imagery.md` · `scripts/search_public_imagery.py` |
 | 寫新 PPTX | 讀 `references/pptx-gotchas.md` 先——那六條雷都踩過 |
 | Windows setup | `references/windows-setup.md` |

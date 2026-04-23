@@ -4,6 +4,36 @@ Version history for the `paper-to-deck` skill. Each version corresponds to a rea
 
 ---
 
+## v0.6.0 — 2026-04-24 · OE extension round (Step 3.5)
+
+### Added
+- `references/oe-extension.md` — new reference doc. Protocol for a post-outline, pre-HTML round where the agent proposes 3–4 EBM questions via OpenEvidence MCP and appends each as one slide at the end of the deck. Documents the framing (extend, not audit), the bundle format (axis + flavor table), flavor rule (mainly A "clinician's-next-question", at least one B "evidence-deepener"), axis coverage (therapy / prognosis / diagnosis), question-selection heuristics (prioritize gaps the paper names explicitly, then weak-evidence points a clinician would actually apply), per-slide rendering rules (question-form title is the narrow exception to the deck-wide statement-title rule, `data-extension="true"` marker for subtle visual differentiation), and placement (between V7 Takeaways and References).
+- `SKILL.md` Step 3.5 · new prose section between Step 3 (outline) and Step 4 (HTML). Summarises the protocol and points at `references/oe-extension.md` for full detail. Includes explicit skip conditions (non-clinical paper, deck <10 slides, user opts out).
+- `SKILL.md` Checkpoint · new line item "Step 3.5 OE extension round offered to the user; if accepted, 3–4 extension slides added with axis + flavor trace and `article_id` from OE."
+- `SKILL.md` ASCII workflow diagram updated from 6 steps to 7, with Step 3.5 shown as opt-in for clinical papers.
+
+### Changed
+- `SKILL.md` frontmatter version → 0.6.0; `updated` → 2026-04-24; description extended to mention Step 3.5 and the extend-not-audit framing.
+- `SKILL.md` Reference files table · new row for `oe-extension.md` between `anti-slop-academic.md` and `citation-on-slide.md`.
+
+### Why this version exists
+Two back-to-back events drove the rework. On 2026-04-23 the Tande 2026 SEA deck reached slide 22 (a three-big-stat outcome slide). The user asked for an OE-backed citation audit of the four claims; the agent produced `slide22_audit.md` with PASS/CAUTION/FAIL verdicts and per-claim fix suggestions. The audit was technically correct — two CAUTION calls on phrasing (the "5-10% in-hospital" number overlapping 90-day range; the "not surgical speed" clause being too strong) were defensible against downstream literature — but the output was tonally wrong for a journal-club deck. Audit reports are adversarial artifacts; decks are synthesis artifacts. The user re-framed on 2026-04-24: OE's role in this skill should be **paper extension**, not **paper challenge**. The agent should propose 3–4 EBM questions the paper *raises but doesn't fully answer*, and each becomes a slide at the end.
+
+A subtler motivation surfaced during the reframe discussion: OE's evidence base is downstream of the paper being presented. The same literature that would "externally verify" the paper's claims very often *cites* the paper being verified. That circularity undermines audit but *enhances* extension — when the question is "what lies beyond this paper", downstream literature citing it is exactly the right source.
+
+The flavor rule (mainly A, at least one B) emerged from a second round of discussion: pure-A bundles read as Googleable FAQ (useful but shallow); pure-B bundles read as methodology lectures (rigorous but off-brand for lab meeting / journal club). The 3+1 split preserves practicality while giving one slot for genuine evidence depth. The axis rule (therapy / prognosis / diagnosis) came from the user directly and was not agent-proposed — it maps cleanly onto how an ID clinician mentally indexes clinical papers.
+
+The question-form slide title exception was deliberately scoped narrowly. The deck-wide rule "slide title is a statement or question, not a topic label" already allows questions as titles; the extension-slide rule tightens that to *always questions* because the narrative function is *pose-then-answer*. Without this tightening the agent would drift toward summary titles ("Whole-spine MRI coverage"), which collapses the pedagogical beat.
+
+### Known limitations
+- OE MCP auth degrades gracefully in few sessions — cookies expire and the user has to re-auth in a fresh session. The skill explicitly does NOT try to run the extension round with a subset of working OE calls; partial OE coverage is worse than none because a half-OE, half-agent-synthesized extension block is indistinguishable from the audience's POV.
+- Non-clinical papers have no natural therapy/prognosis/diagnosis axis. v0.6.0 skips extension for non-clinical papers entirely; a future version might define per-domain axis mappings (e.g., for ML: "architecture variant / training regime / evaluation protocol"), but that requires real paper runs in other domains first.
+- The `data-extension="true"` visual cue in the HTML deck is specified but not yet implemented in any theme file (`assets/themes/*.json`). The first deck that runs Step 3.5 through HTML will need to wire it. Recommended: dashed top-rule 1px at 15% opacity of the accent colour, or a 2% muted background tint. Pick and commit the choice to the theme files after the first run.
+- The `article_id` trace in `outline.md` speaker notes is a UX bet — the assumption is that the presenter-mode walkthrough will want to chase one of the OE artifacts if an extension slide raises a question during rehearsal. If the user never actually opens the artifacts, this trace is dead weight and should be dropped in v0.6.1.
+- No eval case yet — extension-round outcome quality is hard to grade automatically. Candidate metric for future: % of proposed questions the user accepts without revision. Needs at least 3 clinical papers with extension rounds run to benchmark.
+
+---
+
 ## v0.5.0 — 2026-04-23 · Medical-teaching visual style + public-domain imagery
 
 ### Added
@@ -214,3 +244,6 @@ Items identified but not yet written. These become releases when driven by a rea
 - **LaTeX Beamer handoff**: when the user chooses Beamer output via `equation-handling.md` path (c), the skill should route to `claude-scientific-writer:venue-templates` rather than drop the work. The handoff is not yet wired.
 - **Evaluation harness expansion**: `evals/evals.json` currently has one case (the Lancet review). Add at least one primary-research case (arXiv ML paper), one short-format case (5-min lightning talk), and one bilingual-notes case.
 - **Per-paper design brief template**: currently the interview produces an ad-hoc `design_brief.json`. Formalize as a schema and version it.
+- **OE extension visual cue in themes**: `data-extension="true"` marker is specified in v0.6.0 but no theme file implements the visual treatment (dashed top-rule, muted background, etc.). First deck that runs Step 3.5 through HTML should pick and commit the choice into `assets/themes/*.json`.
+- **Extension-round acceptance-rate metric**: define a success metric for Step 3.5 (suggested: % of agent-proposed questions the user accepts without revision). Needs ≥3 clinical papers with extension rounds to establish baseline.
+- **Non-clinical-paper extension axes**: v0.6.0 skips Step 3.5 for non-clinical papers because therapy/prognosis/diagnosis doesn't map. A ML-domain extension round would need its own axes (e.g., architecture / training / evaluation). Deferred until an ML paper actually asks for it.
