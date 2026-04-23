@@ -1,0 +1,45 @@
+{
+  "id": "minimal",
+  "label": "Minimal (formal conference / primary-trial safe)",
+  "description": "Pure black/white body. No pastel fills. No red accent. Use for mortality RCTs and formal conference contexts where visual levity would be inappropriate.",
+  "palette": {
+    "text.body": "#000000",
+    "text.muted": "#6C757D",
+    "accent.red": "#000000",
+    "structure.primary": "#000000",
+    "structure.secondary": "#6C757D",
+    "background": "#FFFFFF",
+    "pastel.pink": "#FFFFFF",
+    "pastel.green": "#FFFFFF",
+    "pastel.yellow": "#FFFFFF",
+    "pastel.cream": "#FFFFFF",
+    "pastel.blue": "#FFFFFF"
+  },
+  "typography": {
+    "display.family": "Inter Black, Arial Black, Taipei Sans TC Beta, Microsoft JhengHei, sans-serif",
+    "body.family":    "Inter, Taipei Sans TC Beta, Microsoft JhengHei, sans-serif",
+    "cover.title_pt": 60,
+    "slide.title_pt": 40,
+    "eyebrow_pt": 16,
+    "body_pt": 24,
+    "caption_pt": 11
+  },
+  "cover": {
+    "default_template": "V1c-minimal",
+    "title_color": "text.body"
+  },
+  "footer": {
+    "enabled_by_default": false,
+    "fill": "#FFFFFF",
+    "text_color": "text.muted",
+    "height_pt": 18
+  },
+  "key_takeaways_grid": {
+    "enabled_by_default": false,
+    "tile_fills": ["background", "background", "background", "background", "background"]
+  },
+  "part_divider": {
+    "auto_enable_min_slides": 20,
+    "eyebrow_color": "text.muted"
+  }
+}

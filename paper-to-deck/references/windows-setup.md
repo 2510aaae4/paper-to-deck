@@ -97,6 +97,66 @@ This uses the OS default browser handler on Windows, macOS, and Linux.
 
 ---
 
+## 6a · `huggingface_hub` WinError 1314 without Developer Mode
+
+**Symptom** (first observed 2026-04-23, `docling 2.90.0` + `huggingface_hub 1.11.0`):
+```
+[WARN] docling unavailable or failed: [WinError 1314] 用戶端沒有這項特殊權限。:
+  '..\\..\\blobs\\2c5b...' -> 'C:\\Users\\dr\\.cache\\huggingface\\hub\\
+  models--docling-project--docling-layout-heron\\snapshots\\...\\README.md'
+```
+
+The warning printed just above it tells you the mechanism:
+```
+To support symlinks on Windows, you either need to activate Developer Mode
+or to run Python as an administrator.
+```
+
+**Cause:** `huggingface_hub` stores downloaded models as blobs and uses symlinks in `snapshots/<revision>/` to point at the blobs. Symlink creation on Windows requires either (a) Developer Mode on or (b) admin privileges. Without either, the final step of the model download fails — *after* blobs have already downloaded, leaving a half-built cache that `docling` can't use.
+
+**Fix (one-time, preferred):** enable **Developer Mode**:
+1. Settings → Privacy & Security → For developers
+2. Toggle "Developer Mode" to On
+3. Confirm the warning dialog
+
+No reboot, no admin password needed. Persistent across updates. Every `huggingface_hub` download afterwards creates symlinks cleanly.
+
+**If the first docling run already aborted**: delete the partial cache before retrying. The half-built tree otherwise makes docling think the model is present:
+```
+rm -rf ~/.cache/huggingface/hub/models--docling-project--docling-layout-heron
+```
+Then re-run `extract_paper.py`; the model re-downloads (~400 MB).
+
+**Why not run as admin every time**: it works, but elevated shells are a bad default (credentials risk, shell history in admin context, and the cache ends up owned by the admin profile rather than the user). Developer Mode is the correct fix.
+
+**Why not set an env var**: `huggingface_hub` 1.11.0 has no env var to force copy-fallback when symlinks fail. Newer versions have automatic fallback, but 1.11 (bundled with `docling 2.90.0`) does not. If you're on a later version and the symptom disappears, mark this entry as historical.
+
+---
+
+## 6b · Docling `std::bad_alloc` on text-heavy later pages
+
+**Symptom** (first observed 2026-04-23 on a CID SRMA, 14-page PDF):
+```
+Stage preprocess failed for run 1, pages [7]: std::bad_alloc
+Stage preprocess failed for run 1, pages [8]: std::bad_alloc
+...
+Stage preprocess failed for run 1, pages [14]: std::bad_alloc
+[INFO] docling found 2 pictures (post-filter), 1 tables
+```
+
+The layout model's preprocessor ran out of memory on pages 7–14 — the reference-list-heavy back half of the PDF. Tier 0 output was limited to pages 1–6; any figure/table on a failed page (Fig 3 on page 11 in the observed case) fell back to Tier 2 (caption-anchored crop). Pipeline still produced valid output; nothing was dropped.
+
+**Why this happens:** `docling-ibm-models` uses a layout segmentation model whose memory grows with page complexity. Text-dense reference pages (small font, many columns of citations) can trip the allocator, especially on 8 GB / 16 GB machines running other apps.
+
+**Mitigations, not yet wired into the skill:**
+- Limit docling to the pages that actually have figures / tables (the caption index built by `_build_caption_index` already knows these). This trades a small scan cost for avoiding the heavy preprocessor on reference pages.
+- Run docling with `PdfPipelineOptions.do_ocr = False` when the PDF has a text layer (we already know it does, per `full_text`). OCR adds memory pressure.
+- Increase Windows page file / close other apps before running.
+
+For now, the pipeline's graceful Tier 0 → Tier 2 fallback handles this well enough; add to this log when the workaround becomes worth the code complexity.
+
+---
+
 ## 6 · Path handling in prompts and skills
 
 When the user provides a Windows path in a prompt (e.g. `D:\papers\foo.pdf`), the backslashes survive intact through to Python — but any intermediate shell invocation will munge them. In this skill's scripts:
@@ -113,6 +173,8 @@ This section is a lab-notebook-style log. Every time a tool version change cause
 
 | Date | Tool | Versions | Symptom | Workaround |
 |---|---|---|---|---|
+| 2026-04-23 | `docling-ibm-models` preprocessor | docling 2.90.0 | `std::bad_alloc` on text-dense reference-list pages; Tier 0 silently skips those pages, Tier 2 fallback picks up | See §6b. Skill's fallback chain handles it; no code change yet. |
+| 2026-04-23 | `huggingface_hub` | 1.11.0 | `WinError 1314` creating symlinks in `~/.cache/huggingface/hub/.../snapshots/` because Windows blocks symlink creation without Developer Mode or admin | Enable Windows Developer Mode (Settings → Privacy & Security → For developers). See §6a. |
 | 2026-04-22 | Python stdout on Windows Traditional-Chinese locale (second sighting) | cp950 default | `start/scripts/validate_pdf.py` printing a PDF title line containing em-space `U+2003` crashed despite ASCII-only `[OK]` markers, because the extracted *data* was not ASCII-safe | Added `sys.stdout.reconfigure(encoding="utf-8", errors="replace")` at script top AND collapsed unicode whitespace with `" ".join(s.split())`. The rule "emit only ASCII" applies to extracted data too — literal markers are not enough. |
 | 2026-04-22 | Python stdout on Windows Traditional-Chinese locale | cp950 default | `print("✓ ...")` raises `UnicodeEncodeError` even though file I/O is UTF-8 | All scripts in `scripts/` emit ASCII only to stdout. See §1 above. |
 | 2026-04-22 | `pymupdf` | 1.25.5 | `page.get_images()` returns empty list on Elsevier-family PDFs despite visible figures | Fall back to caption-anchored page crop — see `pdf-extraction.md` Tier 2. Behavior stems from the publisher's vector-compositing pipeline, not a pymupdf bug. |

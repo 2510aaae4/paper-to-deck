@@ -1,7 +1,7 @@
 ---
 name: start
-version: 0.1.0
-updated: 2026-04-22
+version: 0.2.0
+updated: 2026-04-23
 description: Entry-point onboarding for the paper-to-deck workflow. Use whenever the user says "開始", "start", "新的 paper", "開始做簡報", "做新的 journal club", "幫我做一篇新論文的簡報", or similar phrases that signal they want to begin a paper → slide deck job but haven't yet supplied a PDF path or answered the interview. Handles the first-touch interaction only: greets, asks for the paper, verifies the file is accessible and is actually a research paper, confirms the expected workflow, then hands off to the `paper-to-deck` skill. If the user already supplied a PDF path in their first message, skip this skill and invoke `paper-to-deck` directly.
 ---
 
@@ -13,7 +13,22 @@ You're the friendly front door to the `paper-to-deck` pipeline. Your only job is
 
 ---
 
-## The three-step onboarding
+## The four-step onboarding
+
+### Step 0 · Screen dependencies (runs once per session)
+
+Before asking the user anything, run `scripts/check_deps.py` to confirm the Python environment has what the pipeline needs. This takes well under a second and catches missing packages before the user commits to answering the interview.
+
+- **Required** (pipeline stops without these): `pymupdf`, `pillow`
+- **Optional** (pipeline works; some v0.5.0 features disabled without these):
+  - `docling` — enables Tier 0 extraction and V5 native editable tables. Without it, tables fall back to PNG crops (still usable, just not editable in PowerPoint).
+  - `requests` — needed only for interview Q17 public-imagery fetch. Without it, Q17 still runs but any ticked candidate that would have been fetched is marked "network unavailable".
+
+Exit-code contract:
+- `0` → all required present (optional status printed); continue to Step 1
+- `2` → at least one required package missing; surface the install command to the user and **stop**. Do not proceed to Step 1 until the user has re-run `check_deps.py` and it exits 0.
+
+Do not auto-install. If a package is missing, print the install command (`py -m pip install --user <name>`) and ask the user to run it. Rationale: v0.5.0 opens a narrow public-imagery fetch path that relies on `requests`; silently pulling a new dependency into the user's environment without asking contradicts the safety posture below.
 
 ### Step 1 · Greet and ask for the paper
 
@@ -86,7 +101,7 @@ Inherited from `paper-to-deck` D5:
 - Do not read `~/Downloads`, `~/Desktop`, or any directory the user did not name.
 - Do not run `curl` to external sites as part of paper validation — the whole validation happens locally on the user's PDF.
 - Do not auto-launch other skills (brand protocol, asset search) — those are for non-academic design work.
-- Do not install packages without asking — if `pymupdf` is missing, tell the user the one-line install command and wait.
+- Do not install packages without asking. `scripts/check_deps.py` will *report* missing packages with install commands; the user runs the install. This applies to every dependency — required (pymupdf, pillow) and optional (docling, requests) alike.
 
 ## What this skill does NOT do
 

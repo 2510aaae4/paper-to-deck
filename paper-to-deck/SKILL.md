@@ -1,8 +1,8 @@
 ---
 name: paper-to-deck
-version: 0.4.1
+version: 0.5.0
 updated: 2026-04-23
-description: Convert an academic paper PDF into a polished, presentation-ready slide deck (.pptx). Use this whenever the user hands over a research PDF and wants slides — journal club, lab meeting, conference talk, lightning overview, or any context where they need to present a paper. Also triggers on phrases like "turn this paper into slides", "make a deck from this PDF", "prepare a talk on this article", "論文轉簡報", "做組會報告". Enforces a structured design interview upfront (audience / length / style / emphasis / language) before any slide is drafted — do not skip the interview even if the user seems in a hurry. Default output language is English; always explicitly offer Chinese or bilingual as alternatives.
+description: Convert an academic paper PDF into a polished, presentation-ready slide deck (.pptx). Use this whenever the user hands over a research PDF and wants slides — journal club, lab meeting, conference talk, lightning overview, or any context where they need to present a paper. Also triggers on phrases like "turn this paper into slides", "make a deck from this PDF", "prepare a talk on this article", "論文轉簡報", "做組會報告". Enforces a structured design interview upfront (audience / length / style / emphasis / language / medical-teaching visual options) before any slide is drafted — do not skip the interview even if the user seems in a hurry. Default output language is English; always explicitly offer Chinese or bilingual as alternatives. v0.5.0 adds medical-teaching visual vocabulary (crimson-blue / teal / minimal themes) and narrow allowlisted public-domain imagery fetch.
 ---
 
 # Paper to Deck
@@ -34,10 +34,13 @@ If you reuse any huashu-design component (`deck_stage.js`, `html2pptx.js`, `desi
 |---|---|
 | §1.a Brand asset protocol auto-triggers on any brand/product name | Papers have no brand; triggering would `curl` external sites unnecessarily |
 | Glob `~/Downloads` / `_archive/` for user images | Figures come only from the provided PDF |
-| Fetch from Wikimedia / Unsplash / Pexels for "real images" | Academic slides must not add decorative stock photos |
+| Fetch from Unsplash / Pexels for "real images" | Academic slides must not add decorative stock photos |
 | Auto-run Playwright click tests | Decks are non-interactive; overkill |
 
-The only external-path operation permitted is: reading the user-specified PDF and writing outputs into the project directory.
+Permitted external access (v0.5.0):
+1. Reading the user-specified PDF
+2. `docling` model download on first run
+3. **Whitelisted** public-asset APIs for contextual imagery: Wikimedia Commons, NIH Open-i, CDC PHIL, WHO — and **only** when the user ticks Q17 in the interview. See `references/public-imagery.md` for the allowlist and licence policy.
 
 ---
 
@@ -81,7 +84,9 @@ On Windows, read `references/windows-setup.md` first — the cp950 encoding and 
 If extraction fails completely (scanned PDF with no text layer), the paper needs OCR: run `ocrmypdf input.pdf output.pdf` first, then retry. For encrypted or DRM-locked PDFs, the user has to unlock; the skill can't work around that.
 
 ### Step 2 · Interview
-Open `references/interview.md`. It contains a question bank organized by category. Pick **at least 10** questions; **at least 4** must be paper-specific.
+Open `references/interview.md`. It contains a question bank organized by category. Pick **at least 10** questions; **at least 4** must be paper-specific. v0.5.0 adds Category H (medical-teaching visual options, Q13–Q17) which sits between paper-specific questions and Typography.
+
+**Before presenting Q17 (public-domain imagery batch)**, read `imagery_candidates.json` produced by `extract_paper.py` and embed its candidate list inside the question. Each candidate has `{id, slide_anchor, rationale, suggested_query, source_hint, manual_only}`; present them as a tickable list. After the user selects, invoke `scripts/search_public_imagery.py --approved <ids> --mode strict|loose`. See `references/public-imagery.md` for the allowlist, licence logic, and pop-culture-meme policy (manual-only, agent never fetches).
 
 Paper-specific means: the question refers to something concrete from the extracted `paper.json`. Not "what's the key result?" — instead: "Your Table 3 reports three ablations (frozen encoder / data augmentation / loss weighting) — which one carries the main message?"
 
@@ -196,8 +201,10 @@ No diff recap, no long summary of what was done.
 
 | File | When to read |
 |---|---|
-| `references/interview.md` | Step 2 — the question bank |
-| `references/slide-patterns.md` | Step 3 — the 9 canonical patterns including thematic review (P9) |
+| `references/interview.md` | Step 2 — the question bank (v0.5 adds Category H) |
+| `references/slide-patterns.md` | Step 3 — the 9 narrative patterns (P1–P9) + medical-teaching visual archetypes (V1–V8) |
+| `references/public-imagery.md` | Step 2 (Q17) — allowlist, licence policy, attribution format, meme policy |
+| `assets/themes/*.json` | Step 4–5 — palette + typography + cover/footer tokens per visual scheme |
 | `references/anti-slop-academic.md` | Step 4 — before writing any slide content |
 | `references/citation-on-slide.md` | Step 3–4 — author-year format, figure attribution, references slide rules |
 | `references/figure-attribution.md` | Step 4 — fair use decision tree, redraw-vs-embed logic |

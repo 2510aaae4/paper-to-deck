@@ -1,0 +1,47 @@
+{
+  "id": "teal",
+  "label": "Teal (deck-2 reference flavour)",
+  "description": "Teal cover block + branded footer + red accent. Matches NCKU College of Medicine Year Review series.",
+  "palette": {
+    "text.body": "#000000",
+    "text.muted": "#6C757D",
+    "accent.red": "#D62027",
+    "structure.primary": "#1E4A5F",
+    "structure.secondary": "#1E4A5F",
+    "background": "#FFFFFF",
+    "pastel.pink": "#F8D7DA",
+    "pastel.green": "#D4EDDA",
+    "pastel.yellow": "#FFF3CD",
+    "pastel.cream": "#FAEBD7",
+    "pastel.blue": "#D0E7F5"
+  },
+  "typography": {
+    "display.family": "Inter Black, Arial Black, Taipei Sans TC Beta, Microsoft JhengHei, sans-serif",
+    "body.family":    "Inter, Taipei Sans TC Beta, Microsoft JhengHei, sans-serif",
+    "cover.title_pt": 60,
+    "slide.title_pt": 44,
+    "eyebrow_pt": 18,
+    "body_pt": 26,
+    "caption_pt": 11
+  },
+  "cover": {
+    "default_template": "V1b-teal-block",
+    "title_color": "#FFFFFF",
+    "block_fill": "structure.primary",
+    "block_height_pct": 0.35
+  },
+  "footer": {
+    "enabled_by_default": true,
+    "fill": "structure.primary",
+    "text_color": "#FFFFFF",
+    "height_pt": 22
+  },
+  "key_takeaways_grid": {
+    "enabled_by_default": false,
+    "tile_fills": ["pastel.pink", "pastel.green", "pastel.yellow", "pastel.cream", "pastel.blue"]
+  },
+  "part_divider": {
+    "auto_enable_min_slides": 20,
+    "eyebrow_color": "accent.red"
+  }
+}

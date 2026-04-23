@@ -5,6 +5,14 @@ test-output/
 test-docling*/
 *.pdf
 
+# Per-paper output directories (extracted figures/tables are copyrighted by the
+# paper's publisher). Slug convention per paper-to-deck SKILL.md Step 1:
+#   <first-author-surname>-<year>-<topic>  e.g. dobrescu-2026-picc
+#   <trial-acronym>[-trial|-study]         e.g. orchestra-trial
+# Add each new paper's output directory explicitly here so we don't accidentally
+# commit extracted artefacts. A broad glob would risk ignoring skill internals.
+dobrescu-2026-picc/
+
 # Third-party licensed material (keep local, do not redistribute)
 claude-canva-design/
 huashu_skill_reference.md

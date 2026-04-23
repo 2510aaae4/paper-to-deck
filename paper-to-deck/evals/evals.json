@@ -119,7 +119,54 @@
       }
     }
   ],
+  "style_inspiration_references": [
+    {
+      "id": "nckuh-antibiotic-year-review-2025-08",
+      "deck_pdf": "_private/style-ref/ (rendered from 20250812_Rational use of antibiotics and antimicrobial resistance.pdf)",
+      "author": "Chin-Shiang Tsai (NCKUH Division of Infectious Diseases)",
+      "slide_count": 50,
+      "type": "internal-medicine year-review teaching lecture (not a single-paper journal club)",
+      "what_to_lift": [
+        "Red accent #D62027 for eyebrows, acronym first-letters (5R, 6P), warning taglines",
+        "Cover mascot + eyebrow + paper title + right-aligned author block",
+        "Declarative titles as findings (e.g. 'Late-career physicians prescribe longer courses')",
+        "Pastel Key Takeaways grid at end (8 tiles)",
+        "Bilingual clinical footnote under data tables",
+        "Native bar chart for local epidemiology instead of image crop",
+        "Collage layout for historical context (book cover + portrait + magazine cover on one slide)"
+      ],
+      "what_not_to_lift_for_journal_club": [
+        "Part 1/2/3 dividers (belong to lectures, not single-paper talks unless deck >= 20 slides)",
+        "Institution-local NCKUH epidemiology data (paper-journal-club must stay within the paper)",
+        "Pop-culture meme images — agent never fetches these; manual-only if user pastes them in"
+      ]
+    },
+    {
+      "id": "nckuh-endocrine-year-review-2023-10",
+      "deck_pdf": "_private/style-ref2/ (rendered from 20231003 Year Review Adrenal Pituitary.pdf)",
+      "author": "non-user; NCKU College of Medicine endocrinology division",
+      "slide_count": 56,
+      "type": "internal-medicine year-review teaching lecture (not a single-paper journal club)",
+      "what_to_lift": [
+        "Teal-block cover variant (top 1/3 #1E4A5F + white title, bottom white + institution logo + large author name)",
+        "Branded footer strip on every body slide (teal fill, white institution text)",
+        "Red-splash emphasis words in otherwise-black title (e.g. 'Plasma/24hr urine metanephrins' with 'metanephrins' in red)",
+        "Chinese body text with red-bold English key terms for mixed-language teaching mode",
+        "Screenshot overlay of guideline sources directly in the slide (when the slide says 'IDSA says X', show the IDSA page)"
+      ],
+      "what_not_to_lift_for_journal_club": [
+        "Harrison's-chapter eyebrow style (single-paper talks use paper-section eyebrows instead)",
+        "Exam-question callout cards (教學特有; journal club doesn't include 國考 items)",
+        "Shrek-for-acromegaly and similar copyrighted meme imagery — manual-only"
+      ]
+    }
+  ],
   "candidate_next_evals": [
+    {
+      "name": "medical-teaching-style-v050-smoke-test",
+      "why": "Exercise v0.5.0 additions end-to-end: Category H interview responses, imagery_candidates.json production, search_public_imagery.py strict-mode fetch on a paper that cites Fleming or WHO AMR data, native editable PPT table from docling HTML",
+      "suggested_paper_type": "An internal-medicine review or primary paper that mentions named historical figures AND reports a summary table amenable to native PPT rebuild"
+    },
     {
       "name": "arxiv-ml-primary-research",
       "why": "Test Tier-1 pdf-extraction (embedded images) and the IMRAD P1-P8 pattern chain on a theory-heavy paper with equations",

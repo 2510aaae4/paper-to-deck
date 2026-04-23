@@ -8,13 +8,17 @@ Dependencies:
     pip install pymupdf pillow
 
 Produces in <out-dir>:
-    paper.json            - structured metadata + artifact index
-    figures/fig-NN.png    - each figure, one image per Figure N caption
-    figures/fig-NN.txt    - sidecar caption text (UTF-8)
-    tables/tbl-NN.png     - each table rendered as an image
-    tables/tbl-NN.txt     - sidecar caption text (UTF-8)
-    pages/page-NN.png     - host-page renders for any figure/table page
-                            (so user can re-crop manually if crop is wrong)
+    paper.json                 - structured metadata + artifact index
+    figures/fig-NN.png         - each figure, one image per Figure N caption
+    figures/fig-NN.txt         - sidecar caption text (UTF-8)
+    tables/tbl-NN.png          - each table rendered as an image
+    tables/tbl-NN.txt          - sidecar caption text (UTF-8)
+    tables/tbl-NN.json         - (v0.5) parsed rows/cols for native PPT tables
+    tables/tbl-NN.html         - (when docling is available)
+    pages/page-NN.png          - host-page renders for any figure/table page
+                                 (so user can re-crop manually if crop is wrong)
+    imagery_candidates.json    - (v0.5) public-domain imagery opportunities
+                                 surfaced in interview Q17
 
 Extraction strategy per artifact (documented in references/pdf-extraction.md):
     Tier 1: page.get_images() for embedded raster figures (rare in journal PDFs)
@@ -75,6 +79,17 @@ def extract(pdf_path: Path, out_dir: Path) -> dict:
     # references/pdf-extraction.md.
     figures, tables = _extract_artifacts(doc, pdf_path, out_dir)
 
+    # v0.5.0: annotate figures with detected sub-panels (A/B/C) from caption
+    for fig in figures:
+        fig["subpanels"] = _detect_subpanels(fig.get("caption", ""))
+
+    # v0.5.0: parse docling HTML tables into structured rows for native PPT
+    # rebuild. Writes tables/tbl-NN.json alongside the existing PNG + HTML.
+    for tbl in tables:
+        structured = _parse_table_structure(out_dir, tbl)
+        if structured is not None:
+            tbl["structured"] = structured
+
     paper = {
         "source_pdf": str(pdf_path),
         "page_count": doc.page_count,
@@ -92,17 +107,25 @@ def extract(pdf_path: Path, out_dir: Path) -> dict:
     (out_dir / "paper.json").write_text(
         json.dumps(paper, indent=2, ensure_ascii=False), encoding="utf-8")
 
-    print(f"[OK] paper.json       -> {out_dir / 'paper.json'}")
-    print(f"[OK] figures/         -> {len(paper['figures'])} image(s)")
-    print(f"[OK] tables/          -> {len(paper['tables'])} image(s)")
-    print(f"[OK] pages/           -> sidecars for all artifact host pages")
-    print(f"[OK] full_text.txt    -> {len(full_text)} chars")
-    print(f"[OK] sections         -> {len(paper['sections'])} detected")
-    print(f"[OK] citations        -> {len(paper['citations'])} detected")
+    # v0.5.0: scan for public-domain imagery opportunities (Q17 batch)
+    candidates = _scan_imagery_candidates(full_text, paper)
+    (out_dir / "imagery_candidates.json").write_text(
+        json.dumps(candidates, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    print(f"[OK] paper.json              -> {out_dir / 'paper.json'}")
+    print(f"[OK] figures/                -> {len(paper['figures'])} image(s)")
+    print(f"[OK] tables/                 -> {len(paper['tables'])} image(s)")
+    print(f"[OK] pages/                  -> sidecars for all artifact host pages")
+    print(f"[OK] full_text.txt           -> {len(full_text)} chars")
+    print(f"[OK] sections                -> {len(paper['sections'])} detected")
+    print(f"[OK] citations               -> {len(paper['citations'])} detected")
+    print(f"[OK] imagery_candidates.json -> {len(candidates)} candidate(s)")
     for fig in paper["figures"]:
-        print(f"     figure {fig['num']}: page {fig['host_page']}  [{fig['tier']}]")
+        sp = f", {len(fig['subpanels'])} subpanels" if fig.get("subpanels") else ""
+        print(f"     figure {fig['num']}: page {fig['host_page']}  [{fig['tier']}{sp}]")
     for tbl in paper["tables"]:
-        print(f"     table  {tbl['num']}: page {tbl['host_page']}  [{tbl['tier']}]")
+        st = " [+structured]" if tbl.get("structured") else ""
+        print(f"     table  {tbl['num']}: page {tbl['host_page']}  [{tbl['tier']}]{st}")
     return paper
 
 
@@ -591,6 +614,325 @@ def _find_citations(text: str) -> list[str]:
             seen.add(key)
             out.append(key)
     return out[:200]
+
+
+# -------------------- v0.5.0: subpanel detection --------------------
+
+def _detect_subpanels(caption: str) -> list[dict]:
+    """
+    Parse a figure caption for sub-panel labels "(A) ... (B) ... (C) ...".
+    Returns [{"label": "A", "description": "..."}, ...] so the deck-builder
+    can crop or reference each panel independently (Figure 2A on one slide,
+    Figure 2B on another).
+
+    Returns [] if no sub-labels found.
+    """
+    if not caption:
+        return []
+    # Common formats: "(A) foo (B) bar (C) baz" / "A, foo. B, bar." / "a) foo b) bar"
+    patterns = [
+        r"\(([A-Za-z])\)\s*([^()]+?)(?=\s*\(([A-Za-z])\)|$)",  # (A) ... (B)
+        r"(?:^|\s)([A-Z]),\s*([^.,]+?)(?:\.|,)(?=\s*[A-Z],)",     # A, foo. B, bar.
+    ]
+    for pat in patterns:
+        hits = re.findall(pat, caption)
+        # Normalise: both regex variants return tuples; first two groups are label + desc
+        parsed = []
+        for h in hits:
+            if len(h) >= 2 and h[0] and h[1]:
+                label = h[0].upper()
+                desc = h[1].strip().rstrip(".,;")
+                # Cap description at 150 chars
+                if 2 < len(desc) < 300:
+                    parsed.append({"label": label, "description": desc[:150]})
+        # Deduplicate by label, preserve order
+        if len(parsed) >= 2:
+            seen = set()
+            unique = []
+            for p in parsed:
+                if p["label"] in seen:
+                    continue
+                seen.add(p["label"])
+                unique.append(p)
+            if len(unique) >= 2:
+                return unique
+    return []
+
+
+# -------------------- v0.5.0: structured table parse --------------------
+
+def _parse_table_structure(out_dir: Path, tbl: dict) -> dict | None:
+    """
+    If a table has docling-provided HTML, parse it into rows/cells so the
+    deck-builder can emit a native editable PPT table (V5 archetype) rather
+    than embedding the PNG crop.
+
+    Each cell preserves:
+      - text        : cleaned display text
+      - is_header   : True when sourced from <th> or within <thead>
+      - colspan     : int >= 1 (from HTML attribute)
+      - rowspan     : int >= 1 (from HTML attribute)
+      - numeric     : float when the text parses as a number (after stripping
+                      units, percent signs, thousands separators, and trailing
+                      footnote markers); None otherwise
+      - footnote    : trailing marker characters ('*', '+', '#', unicode
+                      dagger/double-dagger/section/paragraph) split off from
+                      the main cell body; empty string when none
+
+    A derived `header_row_count` tells the deck-builder how many rows at the
+    top to render as bold header rows (useful for grouped headers that span
+    two lines).
+
+    Writes the structured form to tables/tbl-NN.json. Returns a compact
+    summary (row count, col count, json path) for paper.json, or None when
+    HTML is absent or unparseable.
+    """
+    html_ref = tbl.get("html")
+    if not html_ref:
+        return None
+    html_path = out_dir / html_ref
+    if not html_path.exists():
+        return None
+    try:
+        from html.parser import HTMLParser
+    except Exception:
+        return None
+
+    class TableParser(HTMLParser):
+        FOOTNOTE_CHARS = "*+#†‡§¶"  # * + # dagger ddagger section pilcrow
+
+        def __init__(self):
+            super().__init__()
+            self.rows: list[list[dict]] = []
+            self._current_row: list[dict] | None = None
+            self._cell_buf: list[str] | None = None
+            self._cell_attrs: dict | None = None
+            self._in_cell = False
+            self._in_thead = False
+
+        def handle_starttag(self, tag, attrs):
+            tag = tag.lower()
+            if tag == "thead":
+                self._in_thead = True
+            elif tag == "tr":
+                self._current_row = []
+            elif tag in ("td", "th"):
+                self._cell_buf = []
+                self._cell_attrs = {
+                    "is_header": tag == "th" or self._in_thead,
+                    "colspan": _intish(dict(attrs).get("colspan"), 1),
+                    "rowspan": _intish(dict(attrs).get("rowspan"), 1),
+                }
+                self._in_cell = True
+
+        def handle_endtag(self, tag):
+            tag = tag.lower()
+            if tag == "thead":
+                self._in_thead = False
+            elif tag in ("td", "th") and self._cell_buf is not None:
+                raw = "".join(self._cell_buf)
+                raw = re.sub(r"\s+", " ", raw).strip()
+                text, footnote = _split_footnote(raw, self.FOOTNOTE_CHARS)
+                numeric = _parse_numeric(text)
+                cell = {
+                    "text": text,
+                    "is_header": self._cell_attrs["is_header"],
+                    "colspan": self._cell_attrs["colspan"],
+                    "rowspan": self._cell_attrs["rowspan"],
+                    "numeric": numeric,
+                    "footnote": footnote,
+                }
+                if self._current_row is not None:
+                    self._current_row.append(cell)
+                self._cell_buf = None
+                self._cell_attrs = None
+                self._in_cell = False
+            elif tag == "tr" and self._current_row is not None:
+                if any(c["text"] for c in self._current_row):
+                    self.rows.append(self._current_row)
+                self._current_row = None
+
+        def handle_data(self, data):
+            if self._in_cell and self._cell_buf is not None:
+                self._cell_buf.append(data)
+
+    try:
+        html_text = html_path.read_text(encoding="utf-8", errors="replace")
+        parser = TableParser()
+        parser.feed(html_text)
+    except Exception:
+        return None
+
+    rows = parser.rows
+    if not rows:
+        return None
+
+    # Effective column count accounts for colspan (a 3-cell row where the
+    # last cell has colspan=2 occupies 4 columns, not 3).
+    max_cols = max(
+        sum(c["colspan"] for c in r) for r in rows
+    )
+
+    # Count consecutive header rows at the top (for grouped headers)
+    header_row_count = 0
+    for r in rows:
+        if r and all(c["is_header"] for c in r):
+            header_row_count += 1
+        else:
+            break
+
+    json_path = out_dir / "tables" / f"tbl-{tbl['num']:02d}.json"
+    payload = {
+        "num": tbl["num"],
+        "caption": tbl.get("caption", ""),
+        "rows": len(rows),
+        "cols": max_cols,
+        "header_row_count": header_row_count,
+        "cells": rows,
+    }
+    json_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False),
+                         encoding="utf-8")
+    return {
+        "rows": len(rows),
+        "cols": max_cols,
+        "header_row_count": header_row_count,
+        "json": f"tables/tbl-{tbl['num']:02d}.json",
+    }
+
+
+def _intish(value, default: int) -> int:
+    try:
+        n = int(str(value).strip())
+        return n if n >= 1 else default
+    except (TypeError, ValueError):
+        return default
+
+
+def _split_footnote(text: str, footnote_chars: str) -> tuple[str, str]:
+    """
+    Split a trailing run of footnote markers off the end of a cell.
+    'p = 0.03*' -> ('p = 0.03', '*')
+    '5.2†‡' -> ('5.2', '†‡')
+    '45%' -> ('45%', '')
+    """
+    if not text:
+        return text, ""
+    i = len(text)
+    while i > 0 and text[i - 1] in footnote_chars:
+        i -= 1
+    return text[:i].rstrip(), text[i:].strip()
+
+
+def _parse_numeric(text: str) -> float | None:
+    """
+    Try to coerce a cell string into a number. Strips thousands separators,
+    percent signs, and leading units like 'n=' or '$'. Returns None when the
+    cell contains anything that isn't a clean number + decoration.
+    """
+    if not text:
+        return None
+    # Reject cells that clearly carry text (space-delimited words, but allow
+    # "< 0.001" / "+/-" notation and ranges).
+    if re.search(r"[A-Za-z]{3,}", text):  # 'mean', 'yes', 'n/a' -> text
+        return None
+    stripped = text.strip()
+    # Common decorations to peel off
+    stripped = stripped.replace(",", "")           # thousands sep
+    stripped = stripped.replace("%", "")
+    stripped = re.sub(r"^\s*[<>≤≥]\s*", "", stripped)   # <, >, <=, >=
+    stripped = re.sub(r"^\s*n\s*=\s*", "", stripped, flags=re.I)
+    # Range or plus-minus -> take the central value
+    m = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*(?:±|\+\/-|\+-)\s*(-?\d+(?:\.\d+)?)\s*$", stripped)
+    if m:
+        return float(m.group(1))
+    m = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*[-–]\s*(-?\d+(?:\.\d+)?)\s*$", stripped)
+    if m:
+        try:
+            lo, hi = float(m.group(1)), float(m.group(2))
+            return (lo + hi) / 2
+        except ValueError:
+            return None
+    # Plain number
+    try:
+        return float(stripped)
+    except ValueError:
+        return None
+
+
+# -------------------- v0.5.0: imagery opportunity scan --------------------
+
+# Anchor phrases that suggest a public-domain image would strengthen a slide.
+# Each entry: (regex, source_hint, query_template, rationale_template)
+_IMAGERY_ANCHORS = [
+    # Historical figures (Wikimedia portraits)
+    (r"\bFleming\b", "wikimedia-commons",
+     "Alexander Fleming portrait",
+     "Paper references Fleming; a historical portrait anchors the introduction."),
+    (r"\bPasteur\b", "wikimedia-commons",
+     "Louis Pasteur portrait",
+     "Paper references Pasteur; historical portrait strengthens context."),
+    (r"\bFlorey\b", "wikimedia-commons",
+     "Howard Florey portrait",
+     "Paper references Florey; historical portrait strengthens context."),
+    (r"\bKoch\b(?!.*\bpostulate)", "wikimedia-commons",
+     "Robert Koch portrait",
+     "Paper references Koch; historical portrait strengthens context."),
+    # Major guidelines / bodies (screenshot suggestion -- manual-only because
+    # web page screenshots are not image assets per se)
+    (r"\bIDSA\b", "who", "IDSA guideline homepage",
+     "Paper cites IDSA guidelines; consider a title-page screenshot (manual)."),
+    (r"\bWHO\b.*(?:AMR|antimicrobial|resistance)", "who",
+     "WHO antimicrobial resistance report map",
+     "Paper cites WHO AMR data; a WHO global map strengthens the epidemiology slide."),
+    (r"\b(?:ADA|EASD)\b.*(?:guideline|consensus)", "wikimedia-commons",
+     "ADA EASD diabetes guideline",
+     "Paper cites ADA/EASD guideline; official emblem or consensus figure."),
+    # Organisms / pathogens (Wikimedia microscopy)
+    (r"\bStaphylococcus\s+aureus\b|\bS\.\s*aureus\b", "cdc-phil",
+     "Staphylococcus aureus micrograph",
+     "Paper discusses S. aureus; consider a gram-stain or electron-micrograph."),
+    (r"\bKlebsiella\s+pneumoniae\b", "cdc-phil",
+     "Klebsiella pneumoniae micrograph",
+     "Paper discusses K. pneumoniae; consider a micrograph from CDC PHIL."),
+    (r"\bEscherichia\s+coli\b|\bE\.\s*coli\b", "cdc-phil",
+     "Escherichia coli micrograph",
+     "Paper discusses E. coli; consider a micrograph from CDC PHIL."),
+    # Endocrine mnemonic (manual-only meme)
+    (r"\bacromegaly\b", "manual",
+     "Acromegaly facial features meme",
+     "Acromegaly is often taught with a pop-culture facial mnemonic (Shrek, historical giants). Agent will leave a placeholder -- paste manually."),
+]
+
+
+def _scan_imagery_candidates(full_text: str, paper: dict) -> list[dict]:
+    """
+    Scan the paper text for phrases that suggest public-domain imagery
+    opportunities. Each hit becomes a candidate that the agent will
+    surface in interview Q17.
+
+    Returns a list of {id, slide_anchor, rationale, suggested_query,
+    source_hint, manual_only} dicts. Duplicates (same phrase) are removed.
+    """
+    candidates: list[dict] = []
+    seen_queries: set[str] = set()
+    idx = 1
+    for pattern, source_hint, query, rationale in _IMAGERY_ANCHORS:
+        if not re.search(pattern, full_text, re.I):
+            continue
+        if query in seen_queries:
+            continue
+        seen_queries.add(query)
+        manual_only = source_hint == "manual"
+        candidates.append({
+            "id": f"c{idx:02d}",
+            "slide_anchor": "context-or-background",
+            "rationale": rationale,
+            "suggested_query": query,
+            "source_hint": source_hint if not manual_only else "wikimedia-commons",
+            "manual_only": manual_only,
+        })
+        idx += 1
+    return candidates
 
 
 def main():

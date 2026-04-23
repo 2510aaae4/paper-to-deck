@@ -4,6 +4,46 @@ Version history for the `paper-to-deck` skill. Each version corresponds to a rea
 
 ---
 
+## v0.5.0 — 2026-04-23 · Medical-teaching visual style + public-domain imagery
+
+### Added
+- `references/slide-patterns.md` · new bottom section "Medical-teaching visual archetypes" with palette, typography, and eight visual archetypes (V1 Cover × 3 variants, V2 Part divider, V3 Concept, V4 Finding, V5 Native table, V6 Collage, V7 Key Takeaways grid, V8 Branded footer strip). Reverse-engineered from two NCKU 內科 Year Review reference decks (infectious disease + endocrinology, both non-user authored; archived under `_private/style-ref/` and `_private/style-ref2/`).
+- `references/interview.md` · new Category H with five questions (Q13–Q17): visual scheme, cover template, branded footer, body language, contextual public-domain imagery batch. Typography remains Category F and stays last.
+- `references/public-imagery.md` · new reference doc. Allowlist of four sources (Wikimedia Commons / NIH Open-i / CDC PHIL / WHO), strict + loose licence modes, attribution format, and explicit manual-only policy for pop-culture memes (Shrek for acromegaly, Jurassic Park raptor for virulence — legitimately effective mnemonics, but copyrighted and therefore never agent-fetched).
+- `scripts/search_public_imagery.py` · new script. Allowlist-guarded HTTP, token-based licence filter (rejects CC BY-NC in strict, CC BY-ND always), per-candidate attribution JSON sidecars, graceful skip when no CC-licensed match is found. Wikimedia + Open-i + CDC PHIL implemented; WHO deferred to future iteration (returns None until curated endpoint list arrives).
+- `scripts/extract_paper.py` additions:
+  - **Subpanel detection**: `_detect_subpanels()` parses figure captions for `(A) ... (B) ...` patterns, returns a list of labelled sub-panels attached to each figure entry in `paper.json`. Enables one figure's Fig 2A vs Fig 2B to anchor different slides without manual cropping.
+  - **Structured table parse**: when docling produced `tbl-NN.html`, `_parse_table_structure()` re-parses it into `tbl-NN.json` with per-cell metadata — `text`, `is_header` (sourced from `<th>` or `<thead>`), `colspan`, `rowspan`, `numeric` (parsed value after stripping %, thousands separators, ranges, plus-minus), and `footnote` (trailing `*†‡§¶#` markers split off). Top-level `header_row_count` surfaces grouped headers. The deck-builder can emit **native editable PPT tables** (V5 archetype) with merged header cells and bolded header runs, and optionally rebuild a numeric column as a **native bar chart** (V4 archetype) without re-parsing text.
+  - **Imagery opportunity scan**: `_scan_imagery_candidates()` walks the full text for anchor phrases (Fleming / Pasteur / Koch, IDSA / WHO AMR / ADA-EASD guidelines, common pathogens by Latin binomial, endocrine mnemonic terms) and emits `imagery_candidates.json` for the agent to surface in Q17. Each candidate has `{id, slide_anchor, rationale, suggested_query, source_hint, manual_only}`.
+- `assets/themes/` · three theme token files (`crimson-blue.json`, `teal.json`, `minimal.json`) consumed by HTML deck and PPTX builder. Each encodes palette, typography sizes, cover default, footer default, takeaways grid default, part-divider threshold.
+- `docs/plans/2026-04-23-medical-teaching-style-design.md` · design doc capturing the brainstorming session that drove this version.
+
+### Changed
+- `SKILL.md` frontmatter version → 0.5.0 and description extended to mention medical-teaching themes and the narrow public-asset fetch path.
+- `SKILL.md` D5 safety section: the "no external access except PDF + docling" rule now lists four whitelisted public-asset API hosts as a third permitted category. Non-whitelisted hosts remain forbidden.
+- `SKILL.md` Step 2 `Interview`: explicit instruction to read `imagery_candidates.json` before presenting Q17, and to hand the ticked IDs to `search_public_imagery.py`.
+- `SKILL.md` Reference files table: rows added for `public-imagery.md` and `assets/themes/*.json`.
+- `CLAUDE.md` D5 safety guardrail block: expanded to enumerate the four whitelisted API hosts, split strict / loose licence modes, and note the meme manual-only policy. Added `docs/plans/` to the directory tree. "Key files quick-reference" gained rows for medical-teaching visual tuning + public-imagery fetch.
+- Extract pipeline smoke-test coverage: added inline tests for `_detect_subpanels`, `_scan_imagery_candidates`, and `_licence_passes` (not committed as a test file yet — a proper test harness is tracked under Unreleased).
+
+### Why this version exists
+The user reviewed two NCKU 內科 Year Review reference decks (antibiotics talk by Chin-Shiang Tsai 2025-08-12, 50 slides; endocrine talk by another 內分泌科 attending 2023-10-03, 56 slides) and asked whether `paper-to-deck`'s visual output could be brought into the same family. The style is distinctive: bold black centred titles with `#D62027` red accent, teal structural elements, liberal use of pastel blocks for takeaways, meme-tolerant where clinically useful, bilingual footnotes under data tables. None of this was previously capturable by the skill — v0.3 / v0.4 emphasised conservative-academic visual defaults and hard-locked imagery to paper-only.
+
+The decision was **not** to spin off a separate `medical-lecture` skill (the narrative workflow is still single-paper journal club), but to add visual archetypes as opt-in and to carefully open one narrow external-fetch path for contextual imagery. The licence discipline (strict by default, loose as an explicit choice, manual-only for memes) came directly from the user's preference for "OK to hit public-domain sources, not OK to grab arbitrary web images".
+
+### Known limitations
+- WHO search is a no-op stub. The WHO website has no structured API and per-page licences vary; curating a safe endpoint list is deferred until the next paper that actually wants a WHO map.
+- CDC PHIL search is a lightweight HTML scrape; if CDC restructures the page, the scrape will break silently and fall through to `[SKIP] no hits`. Consider wiring a user-agent rotation + version check when a paper relies on PHIL imagery.
+- `_scan_imagery_candidates` anchor list is hand-curated (Fleming, Pasteur, Koch, IDSA, WHO AMR, ADA-EASD, S. aureus, K. pneumoniae, E. coli, acromegaly). Each new paper topic that would benefit from contextual imagery needs a new anchor; do not add broadly-matching patterns that would false-positive.
+- Native editable PPT table emit (V5) requires the `build_pptx.py` *deck script* (deck-specific, not part of this skill repo) to read `tables/tbl-NN.json` and call `python-pptx` `add_table()`. This skill surfaces the data; the deck author wires it through. When tested on a paper, document the table-rendering result and amend `pptx-gotchas.md` if any new run-formatting quirk surfaces.
+- Pop-culture meme slots remain placeholders. If Q17 yields `manual_only: true` entries, the outline must flag each one and the user must paste the image before export. No automation.
+- The reference decks that inspired V1–V8 are both non-user-authored; `evals/evals.json` adds them as *inspiration references*, not eval targets (they're lectures, not journal-club runs of a single paper).
+- **Windows Developer Mode required for docling** (surfaced by the first v0.5.0 SRMA test run on 2026-04-23): `huggingface_hub` 1.11.0 creates symlinks in its cache; without Developer Mode the model download aborts with `WinError 1314` mid-way, leaving a partially-built cache. Documented in `references/windows-setup.md` §6a; `start/scripts/check_deps.py` only detects *missing* packages, not *broken cache* — surfacing that is a candidate improvement for v0.5.1.
+- **Docling `std::bad_alloc` on text-dense later pages**: same SRMA test run saw pages 7–14 fail docling's layout preprocessor; Tier 2 fallback took over cleanly so nothing was lost, but Fig 3 (on page 11) came from Tier 2 instead of Tier 0. Documented in `references/windows-setup.md` §6b.
+- **SoF / GRADE table structured quality**: the same SRMA's Table 2 passed through docling HTML and `_parse_table_structure`, but docling collapsed multi-value cells ("K = 1 N = 2230 1.4% vs 5.1% RR 0.28 ...") into single strings and did not mark any row as `<thead>`, so `header_row_count` came back 0. Table 2 is a complex landscape SoF table; simpler tables likely parse cleanly. Improving the parser is a future call; for now the PNG crop remains the reliable path when the structured JSON is too mangled to use directly.
+
+---
+
 ## v0.4.1 — 2026-04-23 · HTML deck gotchas + hand-off discipline
 
 ### Added
