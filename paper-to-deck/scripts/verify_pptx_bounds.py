@@ -128,21 +128,34 @@ def check_hero_font(prs) -> list[str]:
 
 
 def check_raster_tables(prs, outline_path: Path | None) -> list[str]:
-    """§9: slides tagged for native tables in outline must not contain raster
-    table images."""
+    """§9: slides tagged V5 / native-table in outline.md MUST contain a native
+    table shape (python-pptx GraphicFrame with .has_table). If not, the builder
+    took the raster shortcut — flag.
+
+    Rationale (design note): an earlier version of this check sniffed
+    Picture.image.filename for "tbl-*.png" to decide if the picture was a table
+    raster. This is unreliable — python-pptx renames embedded images to
+    `imageN.png` inside the package zip, so the original filename is lost. The
+    robust formulation is inverse: a V5 slide should HAVE a native table, and
+    if it doesn't, something went wrong regardless of what the picture claims
+    to be.
+    """
     if outline_path is None or not outline_path.exists():
         return []  # can't evaluate without outline
     text = outline_path.read_text(encoding="utf-8", errors="replace")
-    # find slides that mention "native" + "table" or "V5 Table slide"
+    # find slides tagged V5 or explicitly "native table" in the outline.
+    # Split on ANY `\n## ` header (not only `## Slide `) so trailing sections
+    # like `## Caveats flagged for build step` or `## Requested edits` don't
+    # get lumped into the last slide's block and trigger false positives.
     native_table_slides: set[int] = set()
-    for block in re.split(r"\n## Slide ", text):
-        m = re.match(r"(\d+)", block)
+    for block in re.split(r"\n## ", text):
+        m = re.match(r"Slide\s+(\d+)", block)
         if not m:
             continue
         idx = int(m.group(1))
-        lowered = block.lower()
-        if ("native" in lowered and "table" in lowered) or "v5" in lowered:
-            # if the block also says "raster fallback" it's still native-preferred
+        # Match V5 as a word-boundary token (so "V50" etc. won't false-positive).
+        if re.search(r"\bV5\b", block) or re.search(
+                r"native\s+(?:editable\s+)?(?:PP?T\s+)?table", block, re.IGNORECASE):
             native_table_slides.add(idx)
     if not native_table_slides:
         return []
@@ -150,33 +163,26 @@ def check_raster_tables(prs, outline_path: Path | None) -> list[str]:
     for si, slide in enumerate(prs.slides, start=1):
         if si not in native_table_slides:
             continue
-        # count native tables vs pictures whose filename looks like a table
         has_native_table = any(
-            s.has_table for s in slide.shapes if hasattr(s, "has_table")
+            getattr(s, "has_table", False) for s in slide.shapes
         )
-        table_raster_images = [
-            s for s in slide.shapes
-            if s.shape_type == MSO_SHAPE_TYPE.PICTURE
-            and _looks_like_table_raster(s)
+        if has_native_table:
+            continue  # satisfied — builder did the right thing
+        pictures = [
+            s for s in slide.shapes if s.shape_type == MSO_SHAPE_TYPE.PICTURE
         ]
-        if not has_native_table and table_raster_images:
+        if pictures:
             violations.append(
-                f"[slide {si:02d}] §9 outline marks this slide native-table "
-                f"but deck contains raster table image ({len(table_raster_images)} "
-                f"picture shape(s))"
+                f"[slide {si:02d}] §9 outline marks this slide V5 / native-table "
+                f"but deck contains {len(pictures)} picture shape(s) and no "
+                f"native table — raster shortcut taken"
+            )
+        else:
+            violations.append(
+                f"[slide {si:02d}] §9 outline marks this slide V5 / native-table "
+                f"but deck contains no native table shape"
             )
     return violations
-
-
-def _looks_like_table_raster(pic_shape) -> bool:
-    # python-pptx doesn't expose the original filename easily; use the image's
-    # embedded path in the package. Images added from tbl-01.png etc. will have
-    # a predictable filename inside the .pptx zip.
-    try:
-        name = pic_shape.image.filename or ""
-    except Exception:
-        return False
-    return bool(re.search(r"tbl[-_]?\d+", name.lower()))
 
 
 def main():

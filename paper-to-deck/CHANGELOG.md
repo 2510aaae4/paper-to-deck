@@ -4,6 +4,20 @@ Version history for the `paper-to-deck` skill. Each version corresponds to a rea
 
 ---
 
+## v0.6.2 — 2026-04-24 · Hotfix: §9 check in verify_pptx_bounds.py actually catches raster tables now
+
+### Changed
+- `scripts/verify_pptx_bounds.py` · two bugs fixed that prevented the §9 gate from firing against the ENDO-ORAL deck (which shipped with raster tables on V5 slides 8/9/10):
+  1. **Filename heuristic was structurally broken.** The original code sniffed `picture.image.filename` for patterns like `tbl-01.png`, assuming python-pptx preserves the original filename. It does not — images are renamed to `image.png` / `imageN.png` inside the package zip on `add_picture(path)`. Fix: invert the check. A V5 slide MUST contain a native table (`shape.has_table`); if it doesn't, flag any picture present as the raster shortcut. This is robust regardless of filename.
+  2. **Block parser false-positive.** `re.split(r'\n## Slide ', text)` appended every trailing section (e.g. `## Caveats flagged for build step`, `## Requested edits`) to the last numbered slide's block. The ENDO-ORAL outline's caveats section contained the phrase "native editable PPT tables", which made slide 26 (References) get tagged as V5 native-table and flagged for "no native table shape". Fix: split on `\n## ` (any header) and match only blocks whose first token is `Slide N`.
+
+### Why this version exists
+User asked immediately after v0.6.1 pushed: "table 要重製這件事情有寫進去了嗎" — "is the table-recreation thing actually written in?". Prose yes (§9 in pptx-gotchas); checkpoint yes; gate **script broken** — the §9 check passed the ENDO-ORAL deck cleanly even though slides 8/9/10 shipped as raster images. The skill documented the rule, checkpointed it, and pushed code that claimed to enforce it — but the claim was empty. That's worse than silence on the rule, because the green exit code creates false confidence.
+
+The meta-lesson — which goes into `pptx-gotchas.md`'s general-rule section but not as a new numbered entry — is that a verification script's own assertions need a minimal self-test, not just manual "does it catch the test case" smoke. Running the gate against a deck known to have the violation (endo-oral-study.pptx with raster V5 slides) should have been the commit gate for v0.6.1 itself.
+
+---
+
 ## v0.6.1 — 2026-04-24 · PPTX coordinate / overflow / raster-default gate
 
 ### Added

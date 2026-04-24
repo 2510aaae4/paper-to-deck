@@ -1,6 +1,6 @@
 ---
 name: paper-to-deck
-version: 0.6.1
+version: 0.6.2
 updated: 2026-04-24
 description: Convert an academic paper PDF into a polished, presentation-ready slide deck (.pptx). Use this whenever the user hands over a research PDF and wants slides — journal club, lab meeting, conference talk, lightning overview, or any context where they need to present a paper. Also triggers on phrases like "turn this paper into slides", "make a deck from this PDF", "prepare a talk on this article", "論文轉簡報", "做組會報告". Enforces a structured design interview upfront (audience / length / style / emphasis / language / medical-teaching visual options) before any slide is drafted — do not skip the interview even if the user seems in a hurry. Default output language is English; always explicitly offer Chinese or bilingual as alternatives. v0.5.0 adds medical-teaching visual vocabulary (crimson-blue / teal / minimal themes) and narrow allowlisted public-domain imagery fetch. v0.6.0 adds Step 3.5 "OE extension round" — for clinical papers, the agent proposes 3–4 EBM questions (therapy/prognosis/diagnosis) via OpenEvidence MCP and appends each as one slide at the end of the deck, framed as extension not audit.
 ---
