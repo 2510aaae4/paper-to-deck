@@ -4,6 +4,39 @@ Version history for the `paper-to-deck` skill. Each version corresponds to a rea
 
 ---
 
+## v0.6.1 — 2026-04-24 · PPTX coordinate / overflow / raster-default gate
+
+### Added
+- `references/pptx-gotchas.md` · three new entries (§7 coordinate math off-slide, §8 hero font vs box height, §9 "native or raster?" default).
+- `scripts/verify_pptx_bounds.py` · new shared script. Walks every shape on every slide in a built `.pptx` and flags: (a) shapes whose bounding box leaves the slide rectangle (§7); (b) textboxes whose first-run font size exceeds the usable box height (§8); (c) `Picture` shapes on slides the outline tagged as native-table (§9). Exit code 0 = pass; 1 = one or more violations; 2 = usage/file error. Does not render, does not require LibreOffice — pure python-pptx walk, ~1 sec runtime.
+- `SKILL.md` Step 5 · **mandatory pre-declaration gate**: run `verify_pptx_bounds.py <slug>.pptx --outline <slug>/outline.md` before telling the user the deck is done.
+- `SKILL.md` Checkpoint · new line item "`scripts/verify_pptx_bounds.py` passed with exit code 0".
+
+### Changed
+- `SKILL.md` frontmatter version → 0.6.1.
+
+### Why this version exists
+The ENDO-ORAL 2026-04-24 deck (Rallet et al., *Clin Infect Dis* 2026, 26 slides) exposed three classes of PPTX bug simultaneously, each invisible to python-pptx and each a distinct coordinate / layout miscalculation:
+
+1. **Slide 4 timeline** · detail text boxes were centred under the three circle nodes via `x = node_x - box_w/2`. Leftmost node at x=1.2 with a 3.9-inch detail box produced x=-0.3 — the first detail box started 0.3 inch off the left edge of the slide and was silently cropped by PowerPoint. The connector line between nodes overshot the rightmost node by 1.35 inches for the same reason (hard-coded span not derived from actual node positions).
+
+2. **Slide 2 hero** · `"44.7 %"` at 150 pt in a box sized `h=1.8 in`. 150 pt occupies ~2.08 in of vertical space; the box was 14 % too short. python-pptx does not warn; text frame default is "no auto-fit"; PowerPoint silently clipped the digits.
+
+3. **Slide 26 references** · four `ref_group` blocks stacked at y = 1.65 / 2.25 / 3.7 / 5.65. Each block's computed height grew with reference count; group 4 (7 refs) extended to y = 8.02, past the 7.5-inch slide bottom. The last three references were clipped.
+
+Separately, **slides 8/9/10 tables** were shipped as raster images (`tbl-0X.png`) when the outline said "native editable PPT table preferred; raster fallback if rendering breaks." The builder took the raster path for convenience rather than as a genuine fallback. User asked "有重製表格嗎？我好像沒看到" — mid-session rework.
+
+**Root realisation**: reading `pptx-gotchas.md` at the top of Step 5 does not prevent these bugs. The gotchas doc documents them, but shipping them still happens because the bugs are in arithmetic, not intent. The mechanical fix is a mechanical check — a script that walks the output deck and reports violations before the hand-off message is composed. The script is cheap (~1 sec, no rendering), catches all three bug classes deterministically, and doesn't rely on the operator remembering anything.
+
+The three new gotchas entries (§7, §8, §9) document the incident patterns in prose for the operator; the script enforces them in code. Both are required — prose-only teaches the concept, code-only misses edge cases the human catches. Together they make the class of bug structurally harder to ship.
+
+### Known limitations
+- The §9 raster-table check depends on the outline using the token "native" + "table" or "V5" in a slide's descriptor. If the outline phrasing drifts (e.g. "editable data grid"), the check silently passes. Mitigation: keep the `references/slide-patterns.md` V5 vocabulary canonical and use it verbatim in outlines.
+- The §8 font-vs-box check uses first-run size only. A textbox where run 1 is small and run 2 is the hero-size will not be flagged. Unusual pattern but possible. If it happens, add per-run scanning.
+- The bounds check (§7) allows a 0.02-inch tolerance for floating-point rounding. Shapes that overshoot by less than 0.02 inch (~0.5 mm) render fine in practice; tightening the tolerance would produce false positives on legitimate builds.
+
+---
+
 ## v0.6.0 — 2026-04-24 · OE extension round (Step 3.5)
 
 ### Added

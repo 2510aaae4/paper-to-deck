@@ -13,6 +13,7 @@ test-docling*/
 # commit extracted artefacts. A broad glob would risk ignoring skill internals.
 dobrescu-2026-picc/
 tande-2026-spinal-epidural-abscess/
+endo-oral-study/
 
 # OpenEvidence MCP integration · personal session data
 # These MUST never ship publicly, even if _private/ is ever relaxed:

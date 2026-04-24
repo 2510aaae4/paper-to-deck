@@ -1,6 +1,6 @@
 ---
 name: paper-to-deck
-version: 0.6.0
+version: 0.6.1
 updated: 2026-04-24
 description: Convert an academic paper PDF into a polished, presentation-ready slide deck (.pptx). Use this whenever the user hands over a research PDF and wants slides — journal club, lab meeting, conference talk, lightning overview, or any context where they need to present a paper. Also triggers on phrases like "turn this paper into slides", "make a deck from this PDF", "prepare a talk on this article", "論文轉簡報", "做組會報告". Enforces a structured design interview upfront (audience / length / style / emphasis / language / medical-teaching visual options) before any slide is drafted — do not skip the interview even if the user seems in a hurry. Default output language is English; always explicitly offer Chinese or bilingual as alternatives. v0.5.0 adds medical-teaching visual vocabulary (crimson-blue / teal / minimal themes) and narrow allowlisted public-domain imagery fetch. v0.6.0 adds Step 3.5 "OE extension round" — for clinical papers, the agent proposes 3–4 EBM questions (therapy/prognosis/diagnosis) via OpenEvidence MCP and appends each as one slide at the end of the deck, framed as extension not audit.
 ---
@@ -180,6 +180,8 @@ Two routes are available:
 
 After generating, run the verification flow in `references/verification.md` — three tiers (automated LibreOffice render + OCR checks, human inspection of 5 specific slides, presenter-mode walkthrough). Do not trust shape-count or file-size checks alone. The PPTX bugs this skill has shipped were all invisible to `python-pptx` — they only became visible when someone opened the file in PowerPoint.
 
+**Mandatory pre-declaration gate (v0.6.1+)**: run `python scripts/verify_pptx_bounds.py <slug>.pptx --outline <slug>/outline.md` **before** telling the user the deck is done. This script enforces three `pptx-gotchas.md` invariants automatically: (§7) no shape outside the slide rectangle, (§8) no hero textbox whose font exceeds the box height, (§9) no raster table image on a slide the outline tagged as native-table. Non-zero exit = fix the builder script and re-run — do not hand-patch in PowerPoint (changes lost on regeneration). This gate was added after shipping three simultaneous coordinate/overflow bugs in the ENDO-ORAL 2026-04-24 deck; reading the gotchas was not enough, the gate converts each bug class into a hard build-time check.
+
 If the paper relies on LaTeX math, read `references/equation-handling.md` before committing to a rendering path. Options are: (a) raster each equation from the PDF, (b) retype using `matplotlib.text`, or (c) switch to LaTeX Beamer output — each has specific trade-offs documented in the reference.
 
 ### Step 6 · Summary
@@ -217,6 +219,7 @@ No diff recap, no long summary of what was done.
 - [ ] PPTX opens in PowerPoint and text is editable (not flattened)
 - [ ] Language matches what was agreed in the interview
 - [ ] **Visual inspection of at least 3 slides after PPTX generation** — cover, one figure slide, one matrix / multi-card slide. Tracking on all-caps labels looks normal; CJK text uses the requested font; nothing clipped or overflowing.
+- [ ] **`scripts/verify_pptx_bounds.py` passed with exit code 0** (mandatory pre-declaration gate, v0.6.1+). Catches off-slide coordinates, hero font exceeding box height, and raster tables where native was asked for — the three bug classes that shipped in the ENDO-ORAL 2026-04-24 deck.
 
 ## Reference files
 

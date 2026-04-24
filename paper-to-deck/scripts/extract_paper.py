@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -134,13 +135,16 @@ def extract(pdf_path: Path, out_dir: Path) -> dict:
 # Tier 0: docling (optional). If unavailable or fails, fall through to our
 # per-artifact Tier 1/2/2b/2c/3 cropping. See external-extractors.md for
 # the full integration rationale.
-try:
-    from docling.document_converter import DocumentConverter, PdfFormatOption
-    from docling.datamodel.base_models import InputFormat
-    from docling.datamodel.pipeline_options import PdfPipelineOptions
-    DOCLING_AVAILABLE = True
-except Exception:
+if os.environ.get("SKIP_DOCLING"):
     DOCLING_AVAILABLE = False
+else:
+    try:
+        from docling.document_converter import DocumentConverter, PdfFormatOption
+        from docling.datamodel.base_models import InputFormat
+        from docling.datamodel.pipeline_options import PdfPipelineOptions
+        DOCLING_AVAILABLE = True
+    except Exception:
+        DOCLING_AVAILABLE = False
 
 
 def _extract_artifacts(doc, pdf_path: Path, out_dir: Path) -> tuple[list, list]:
